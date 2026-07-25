@@ -8,6 +8,8 @@ CivicLens AI is a production-shaped civic-technology MVP for reporting, verifyin
 
 ## Live product
 
+**Production:** https://civiclens-ai.sabrinaisonni945783.chatgpt.site
+
 The deployed dashboard includes:
 
 - Live Dhaka hazard map with type, area, severity, and search filters
