@@ -1,0 +1,55 @@
+name: Feature request
+description: Suggest a product, AI, or infrastructure improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+      description: What user or operational problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the desired behavior and workflow.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Product area
+      options:
+        - Citizen reporting
+        - Map and geospatial intelligence
+        - Authority operations
+        - Analytics
+        - AI inference
+        - Dataset and training
+        - API and database
+        - Deployment and infrastructure
+        - Accessibility
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: risks
+    attributes:
+      label: Privacy, safety, or bias considerations
+      description: Note any risks to citizens, operators, data privacy, or model fairness.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and pull requests.
+          required: true
+        - label: This request does not require exposing secrets or personal data.
+          required: true
