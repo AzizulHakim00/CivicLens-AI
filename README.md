@@ -12,6 +12,8 @@
 
 **Computer vision · Geospatial intelligence · Civic reporting · Authority operations · Explainable AI**
 
+### [🚀 Open Live CivicLens AI](https://civiclens-ai.mdomor01815.workers.dev/)
+
 </div>
 
 ---
@@ -28,11 +30,12 @@ The project is designed as a complete software product rather than a standalone 
 
 | Service | Status | Link |
 |---|---|---|
-| Web dashboard + Worker API | Deployed on Cloudflare Workers | **Production URL awaiting final repository sync** |
+| Web dashboard + Worker API | Live on Cloudflare Workers | [Open production app](https://civiclens-ai.mdomor01815.workers.dev/) |
+| Report API | Live | [Open `/api/reports`](https://civiclens-ai.mdomor01815.workers.dev/api/reports) |
 | D1 database | Connected | `civiclens-production-db` |
 | FastAPI/ONNX inference | Optional standalone service | See [`ai-service/`](ai-service/) |
 
-The previous ChatGPT-hosted URL has been removed. Add the active `workers.dev` address here after copying it from **Cloudflare → Workers & Pages → civiclens-ai → Domains & Routes**.
+Production is independently hosted in the project owner's Cloudflare account and no longer depends on ChatGPT Sites.
 
 ## Core capabilities
 
@@ -151,6 +154,7 @@ The CI workflow also smoke-tests the Worker homepage and report API before chang
 
 The repository is configured for:
 
+- Production URL: `https://civiclens-ai.mdomor01815.workers.dev/`
 - Cloudflare Worker name: `civiclens-ai`
 - D1 binding: `DB`
 - D1 database: `civiclens-production-db`
