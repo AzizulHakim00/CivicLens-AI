@@ -2,6 +2,13 @@
 
 CivicLens AI is deployed independently on Cloudflare Workers with a Cloudflare D1 database. The production deployment does not depend on ChatGPT Sites.
 
+## Live production
+
+- **Dashboard:** https://civiclens-ai.mdomor01815.workers.dev/
+- **Report API:** https://civiclens-ai.mdomor01815.workers.dev/api/reports
+- **Worker:** `civiclens-ai`
+- **D1 database:** `civiclens-production-db`
+
 ## Production architecture
 
 ```text
@@ -22,6 +29,7 @@ Database: civiclens-production-db
 
 | Resource | Value |
 |---|---|
+| Production URL | `https://civiclens-ai.mdomor01815.workers.dev/` |
 | Worker name | `civiclens-ai` |
 | D1 binding | `DB` |
 | D1 database | `civiclens-production-db` |
@@ -44,19 +52,17 @@ This method does not require Node.js or Wrangler on the user's computer.
 7. Use `npx wrangler deploy` as the deploy command.
 8. Save the configuration and deploy the latest commit.
 
-After deployment, copy the public address from:
+After deployment, confirm the public address under:
 
 ```text
 Cloudflare → Workers & Pages → civiclens-ai → Settings → Domains & Routes
 ```
 
-The address normally follows this pattern:
+Current production address:
 
 ```text
-https://civiclens-ai.<account-subdomain>.workers.dev
+https://civiclens-ai.mdomor01815.workers.dev/
 ```
-
-Do not write a guessed account subdomain into the README. Copy the exact URL shown by Cloudflare.
 
 ## Database initialization
 
@@ -103,8 +109,8 @@ When Git integration is enabled, each push to `main` triggers a new Cloudflare b
 After each deployment, check:
 
 ```text
-GET /
-GET /api/reports
+GET https://civiclens-ai.mdomor01815.workers.dev/
+GET https://civiclens-ai.mdomor01815.workers.dev/api/reports
 ```
 
 The homepage should render the CivicLens dashboard. The API should return either a reports array or a clear storage error.
