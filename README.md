@@ -1,67 +1,162 @@
+<div align="center">
+
 # CivicLens AI
 
-**Explainable urban hazard detection and geospatial reporting platform**
+### Explainable Urban Hazard Detection & Geospatial Reporting Platform
 
-CivicLens AI is a production-shaped civic intelligence platform for reporting, verifying, prioritizing, and resolving road hazards. It combines a responsive operations dashboard, citizen and camera reporting, explainable bounding-box results, severity scoring, duplicate awareness, predictive road intelligence, authority dispatch, a persistent audit trail, city analytics, and a FastAPI/ONNX inference service.
+[![CI](https://github.com/AzizulHakim00/CivicLens-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/AzizulHakim00/CivicLens-AI/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](docs/deployment.md)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
-> The deployed UI ships in transparent **demo-inference mode** because trained model weights and a validated road-hazard dataset are not committed to the repository. The adapter contract is ready for a real ONNX detector; benchmark values shown in the demo are product targets, not claimed experiment results.
+**Computer vision · Geospatial intelligence · Civic reporting · Authority operations · Explainable AI**
 
-## Live product
+</div>
 
-**Production:** https://civiclens-ai.sabrinaisonni945783.chatgpt.site
+---
 
-The deployed dashboard includes:
+## Overview
 
-- Live Dhaka hazard map with type, area, severity, and search filters
-- Citizen evidence upload with a three-step AI verification flow
-- Explainable bounding-box result and confidence/severity review
-- GPS/location capture with duplicate-report warning
-- Hazard report center with workflow status updates
-- Analytics for detection, resolution, distribution, coverage, and response time
-- Road intelligence workspace with corridor condition scores, weather/traffic simulation, predictive maintenance, and sensor health
-- Authority command center with SLA prioritization, team assignment, Kanban dispatch, escalation watch, and workflow audit events
-- AI model operations with registry state, confidence control, dataset readiness, per-class targets, and production lifecycle visibility
-- Eight hazard classes: pothole, plastic waste, waterlogging, open manhole, broken road, illegal dumping, traffic obstruction, and damaged streetlight
-- CSV export, responsive navigation, keyboard-friendly controls, and reduced-motion support
-- D1-backed report create/read/update API with bounded payloads, ownership, SLA, source, priority, and status history
+CivicLens AI is an end-to-end civic intelligence platform for reporting, verifying, prioritizing, and resolving urban road hazards. It combines a responsive citizen and authority dashboard, geospatial reporting, explainable detection results, severity scoring, duplicate awareness, operational analytics, and a deployable AI inference service.
+
+The project is designed as a complete software product rather than a standalone machine-learning notebook.
+
+> **Model transparency:** The public dashboard currently uses deterministic demo inference because trained production weights and a validated road-hazard dataset are not committed to this repository. The ONNX adapter and training pipeline are ready for real model integration. Demo confidence values and target metrics are not claimed experiment results.
+
+## Live deployment
+
+| Service | Status | Link |
+|---|---|---|
+| Web dashboard + Worker API | Deployed on Cloudflare Workers | **Production URL awaiting final repository sync** |
+| D1 database | Connected | `civiclens-production-db` |
+| FastAPI/ONNX inference | Optional standalone service | See [`ai-service/`](ai-service/) |
+
+The previous ChatGPT-hosted URL has been removed. Add the active `workers.dev` address here after copying it from **Cloudflare → Workers & Pages → civiclens-ai → Domains & Routes**.
+
+## Core capabilities
+
+### Citizen reporting
+
+- Upload road evidence from desktop or mobile
+- Capture or enter GPS/location information
+- Review bounding boxes, confidence, and severity
+- Receive duplicate-report warnings
+- Submit a tracked hazard report
+
+### Urban hazard intelligence
+
+- Pothole
+- Plastic waste
+- Waterlogging
+- Open manhole
+- Broken road
+- Illegal dumping
+- Traffic obstruction
+- Damaged streetlight
+
+### Authority operations
+
+- Live hazard map with filters and search
+- SLA and priority-based dispatch
+- Team assignment and Kanban workflow
+- Status history and audit events
+- Road-condition and corridor intelligence
+- CSV export and operational analytics
+
+### AI and MLOps
+
+- YOLO-format dataset validation
+- Reproducible training and evaluation scripts
+- Per-class precision/recall and mAP workflow
+- Image and video inference endpoints
+- ONNX Runtime adapter
+- Explainable detection regions
+- Transparent demo/real-model separation
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    A["Citizen image"] --> B["Web dashboard"]
-    B --> C["Demo or ONNX adapter"]
-    C --> D["Detection + severity"]
-    D --> E["Report workflow API"]
-    E --> F[("D1 + audit history")]
-    E --> G["Authority command center"]
+    A[Citizen or dashcam evidence] --> B[React / Vinext dashboard]
+    B --> C[Demo inference or FastAPI + ONNX]
+    C --> D[Detection, confidence and severity]
+    D --> E[Cloudflare Worker API]
+    E --> F[(Cloudflare D1)]
+    E --> G[Authority command center]
+    F --> H[Reports and status history]
 ```
 
-The hosted application is a Vinext/React Cloudflare Worker. `ai-service/` is an optional standalone FastAPI adapter for teams that want to serve YOLO/RT-DETR models through ONNX Runtime.
+The production web application runs as a Cloudflare Worker. Report metadata and workflow history are stored in D1. The optional Python inference service can be deployed separately when trained model weights are available.
 
-## Quick start
+Read the full [architecture guide](docs/architecture.md).
 
-Requirements: Node.js 22.13+ and npm.
+## Technology stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, TypeScript, Vinext, Tailwind CSS |
+| Web runtime | Cloudflare Workers, Vite, Wrangler |
+| Database | Cloudflare D1, Drizzle ORM |
+| AI service | FastAPI, Pillow, OpenCV, ONNX Runtime |
+| Training | PyTorch/Ultralytics-compatible YOLO workflow |
+| Quality | ESLint, Node test runner, Pytest, GitHub Actions |
+| Packaging | Docker |
+
+## Repository structure
+
+```text
+CivicLens-AI/
+├── app/                     Dashboard and report API routes
+├── ai-service/              FastAPI inference and training pipeline
+├── db/                      D1 schema and database helper
+├── drizzle/                 Versioned database migrations
+├── docs/                    Architecture, API, model and deployment docs
+├── tests/                   Worker and API tests
+├── worker/                  Cloudflare Worker entry point
+├── .github/workflows/       CI validation
+├── wrangler.jsonc           Cloudflare Worker and D1 configuration
+└── README.md
+```
+
+## Local development
+
+### Requirements
+
+- Node.js 22.13 or newer
+- npm
+
+### Run the web application
 
 ```bash
+git clone https://github.com/AzizulHakim00/CivicLens-AI.git
+cd CivicLens-AI
 npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite.
+Use the local URL printed by Vite.
 
-Quality checks:
+### Quality checks
 
 ```bash
 npm run lint
 npm test
+npx wrangler deploy --dry-run
 ```
 
-Generate a D1 migration after schema changes:
+The CI workflow also smoke-tests the Worker homepage and report API before changes are accepted.
 
-```bash
-npm run db:generate
-```
+## Cloudflare deployment
+
+The repository is configured for:
+
+- Cloudflare Worker name: `civiclens-ai`
+- D1 binding: `DB`
+- D1 database: `civiclens-production-db`
+- Production branch: `main`
+
+Detailed browser-only and CLI deployment instructions are available in [docs/deployment.md](docs/deployment.md).
 
 ## Optional AI service
 
@@ -73,54 +168,76 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-The service starts in deterministic demo mode when `MODEL_PATH` is unset. Set `MODEL_PATH` to a compatible YOLO-style ONNX export to enable real CPU inference.
+On Windows PowerShell, activate the environment with:
 
-Image and video inference:
-
-```bash
-curl -F file=@road.jpg http://localhost:8000/predict-image
-curl -F file=@dashcam.mp4 http://localhost:8000/predict-video
+```powershell
+.venv\Scripts\Activate.ps1
 ```
 
-## Training workflow
+Available endpoints:
 
-The included pipeline validates YOLO labels, trains reproducibly, evaluates the held-out test split, creates plots/confusion matrices through Ultralytics, and exports ONNX.
+```text
+GET  /health
+GET  /model-info
+POST /predict-image
+POST /predict-video
+```
+
+The service runs in demo mode when `MODEL_PATH` is unset. Set `MODEL_PATH` to a compatible YOLO-style ONNX export to enable model inference.
+
+See the [API reference](docs/api.md) and [model card](docs/model-card.md).
+
+## Training workflow
 
 ```bash
 cd ai-service
 pip install -r training-requirements.txt
 python training/validate_dataset.py --data /path/to/dataset
 python training/train_yolo.py --data training/data.example.yaml
-python training/evaluate_yolo.py --weights runs/civiclens/train/weights/best.pt --data training/data.example.yaml
-python training/export_onnx.py --weights runs/civiclens/train/weights/best.pt
+python training/evaluate_yolo.py \
+  --weights runs/civiclens/train/weights/best.pt \
+  --data training/data.example.yaml
+python training/export_onnx.py \
+  --weights runs/civiclens/train/weights/best.pt
 ```
 
-## Repository map
+## Project status
 
-```text
-app/                React dashboard and report API
-db/                 D1 schema and database helper
-drizzle/            Versioned SQL migrations
-ai-service/         FastAPI image/video inference and reproducible training pipeline
-docs/               Architecture, API, and model card
-tests/              Rendered Worker and API validation tests
-.github/workflows/  Continuous integration
-```
+| Component | Status |
+|---|---|
+| Responsive dashboard | Complete |
+| Worker report API | Complete |
+| D1 persistence and audit history | Complete |
+| Authority command center | Complete |
+| Road intelligence workspace | Complete |
+| Dataset validation pipeline | Complete |
+| ONNX inference adapter | Complete |
+| Trained production model | Requires validated dataset and weights |
+| Evidence object storage | Planned |
+| Authentication and RBAC | Planned |
 
-## Technology
+## Responsible AI and privacy
 
-React 19, TypeScript, Vinext, Tailwind CSS, Cloudflare Workers, D1, Drizzle ORM, FastAPI, Pillow, ONNX Runtime adapter, Docker, and GitHub Actions.
+- Never present demo output as measured model performance.
+- Validate performance across geography, lighting, weather, cameras, and road surfaces.
+- Blur faces and license plates before storing evidence.
+- Keep human review in authority or enforcement workflows.
+- Document dataset consent, licensing, class balance, and failure modes.
+- Add rate limiting and abuse monitoring before large-scale public use.
 
-## Responsible ML notes
+## Documentation
 
-- Never treat demo confidence or target metrics as measured model performance.
-- Validate by geographic area, weather, lighting, camera type, and road material.
-- Blur faces and license plates before persistence.
-- Keep a human in the loop for enforcement or authority actions.
-- Document dataset consent, licensing, class balance, and known failure modes.
+- [Architecture](docs/architecture.md)
+- [API reference](docs/api.md)
+- [Model card](docs/model-card.md)
+- [Deployment guide](docs/deployment.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
 
-More details are in [the architecture guide](docs/architecture.md), [API reference](docs/api.md), and [model card](docs/model-card.md).
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an issue or pull request.
 
 ## License
 
-MIT
+Released under the [MIT License](LICENSE).
