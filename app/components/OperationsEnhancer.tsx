@@ -16,57 +16,94 @@ import {
   Route,
   Search,
   ShieldCheck,
-  Smartphone,
   Wifi,
   WifiOff,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type HealthState = "checking" | "healthy" | "degraded" | "offline";
 
 type HealthPayload = {
   status?: string;
-  database?: {
-    status?: string;
-    latencyMs?: number | null;
-  };
-  inference?: {
-    mode?: string;
-  };
-  timestamp?: string;
-  version?: string;
+  database?: { latencyMs?: number | null };
+  inference?: { mode?: string };
 };
 
-type InstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-};
-
-type CommandAction = {
+type NavigationCommand = {
   id: string;
   label: string;
   description: string;
-  shortcut?: string;
+  target: string;
+  shortcut: string;
   icon: typeof Map;
-  run: () => void;
 };
 
-function clickButton(label: string) {
-  const match = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((button) =>
-    button.textContent?.replace(/\s+/g, " ").trim().toLowerCase().startsWith(label.toLowerCase()),
+const navigationCommands: NavigationCommand[] = [
+  {
+    id: "overview",
+    label: "Open live overview",
+    description: "Return to the city-wide hazard map and active signals.",
+    target: "Live overview",
+    shortcut: "Alt+1",
+    icon: Map,
+  },
+  {
+    id: "reports",
+    label: "Open hazard reports",
+    description: "Review, filter and update tracked reports.",
+    target: "Hazard reports",
+    shortcut: "Alt+2",
+    icon: FileText,
+  },
+  {
+    id: "analytics",
+    label: "Open city analytics",
+    description: "Inspect trends, distributions and response performance.",
+    target: "City analytics",
+    shortcut: "Alt+3",
+    icon: BarChart3,
+  },
+  {
+    id: "roads",
+    label: "Open road intelligence",
+    description: "Explore corridor risk and predictive maintenance.",
+    target: "Road intelligence",
+    shortcut: "Alt+4",
+    icon: Route,
+  },
+  {
+    id: "model",
+    label: "Open AI model operations",
+    description: "Check thresholds, data health and deployment readiness.",
+    target: "AI model",
+    shortcut: "Alt+5",
+    icon: Bot,
+  },
+  {
+    id: "authority",
+    label: "Open authority console",
+    description: "Coordinate teams, SLA risk and field resolution.",
+    target: "Authority console",
+    shortcut: "Alt+6",
+    icon: ShieldCheck,
+  },
+];
+
+function activateButton(label: string) {
+  const button = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((candidate) =>
+    candidate.textContent?.replace(/\s+/g, " ").trim().toLowerCase().startsWith(label.toLowerCase()),
   );
-  match?.click();
-  match?.focus();
+  button?.click();
+  button?.focus();
 }
 
 export default function OperationsEnhancer() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [health, setHealth] = useState<HealthState>("checking");
-  const [healthPayload, setHealthPayload] = useState<HealthPayload | null>(null);
+  const [payload, setPayload] = useState<HealthPayload | null>(null);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
-  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
 
   const checkHealth = useCallback(async () => {
     if (!navigator.onLine) {
@@ -81,9 +118,9 @@ export default function OperationsEnhancer() {
         cache: "no-store",
         headers: { accept: "application/json" },
       });
-      const payload = (await response.json()) as HealthPayload;
-      setHealthPayload(payload);
-      setHealth(response.ok && payload.status === "ok" ? "healthy" : "degraded");
+      const data = (await response.json()) as HealthPayload;
+      setPayload(data);
+      setHealth(response.ok && data.status === "ok" ? "healthy" : "degraded");
     } catch {
       setHealth("offline");
     } finally {
@@ -91,172 +128,80 @@ export default function OperationsEnhancer() {
     }
   }, []);
 
+  const closeCommandCenter = () => {
+    setOpen(false);
+    setQuery("");
+  };
+
+  const runNavigation = (target: string) => {
+    activateButton(target);
+    closeCommandCenter();
+  };
+
   useEffect(() => {
     const main = document.querySelector("main");
     if (main && !main.id) main.id = "main-content";
 
-    const onOnline = () => void checkHealth();
-    const onOffline = () => setHealth("offline");
-    const onInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as InstallPromptEvent);
-    };
+    const firstCheck = window.setTimeout(() => void checkHealth(), 0);
+    const interval = window.setInterval(() => void checkHealth(), 60_000);
+    const handleOnline = () => void checkHealth();
+    const handleOffline = () => setHealth("offline");
 
-    window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOffline);
-    window.addEventListener("beforeinstallprompt", onInstallPrompt);
-    void checkHealth();
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
       navigator.serviceWorker.register("/sw.js").catch(() => undefined);
     }
 
-    const interval = window.setInterval(() => void checkHealth(), 60_000);
     return () => {
+      window.clearTimeout(firstCheck);
       window.clearInterval(interval);
-      window.removeEventListener("online", onOnline);
-      window.removeEventListener("offline", onOffline);
-      window.removeEventListener("beforeinstallprompt", onInstallPrompt);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, [checkHealth]);
 
-  const runAndClose = useCallback((action: () => void) => {
-    action();
-    setOpen(false);
-    setQuery("");
-  }, []);
-
-  const actions = useMemo<CommandAction[]>(
-    () => [
-      {
-        id: "overview",
-        label: "Open live overview",
-        description: "Return to the city-wide hazard map and active signals.",
-        shortcut: "Alt+1",
-        icon: Map,
-        run: () => clickButton("Live overview"),
-      },
-      {
-        id: "reports",
-        label: "Open hazard reports",
-        description: "Review, filter and update tracked reports.",
-        shortcut: "Alt+2",
-        icon: FileText,
-        run: () => clickButton("Hazard reports"),
-      },
-      {
-        id: "analytics",
-        label: "Open city analytics",
-        description: "Inspect trends, distributions and response performance.",
-        shortcut: "Alt+3",
-        icon: BarChart3,
-        run: () => clickButton("City analytics"),
-      },
-      {
-        id: "roads",
-        label: "Open road intelligence",
-        description: "Explore corridor risk and predictive maintenance.",
-        shortcut: "Alt+4",
-        icon: Route,
-        run: () => clickButton("Road intelligence"),
-      },
-      {
-        id: "model",
-        label: "Open AI model operations",
-        description: "Check thresholds, data health and deployment readiness.",
-        shortcut: "Alt+5",
-        icon: Bot,
-        run: () => clickButton("AI model"),
-      },
-      {
-        id: "authority",
-        label: "Open authority console",
-        description: "Coordinate teams, SLA risk and field resolution.",
-        shortcut: "Alt+6",
-        icon: ShieldCheck,
-        run: () => clickButton("Authority console"),
-      },
-      {
-        id: "report",
-        label: "Report a new hazard",
-        description: "Open the citizen evidence and verification workflow.",
-        shortcut: "Alt+R",
-        icon: Plus,
-        run: () => clickButton("Report a hazard"),
-      },
-      {
-        id: "export",
-        label: "Export hazard report",
-        description: "Download the current operational dataset as CSV.",
-        icon: Download,
-        run: () => clickButton("Export report"),
-      },
-      {
-        id: "refresh",
-        label: "Refresh system health",
-        description: "Recheck Worker, API and D1 availability.",
-        icon: RefreshCw,
-        run: () => void checkHealth(),
-      },
-      {
-        id: "api",
-        label: "Open report API",
-        description: "Inspect the live JSON report endpoint in a new tab.",
-        icon: ExternalLink,
-        run: () => window.open("/api/reports", "_blank", "noopener,noreferrer"),
-      },
-    ],
-    [checkHealth],
-  );
-
-  const filteredActions = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return actions;
-    return actions.filter((action) =>
-      `${action.label} ${action.description}`.toLowerCase().includes(needle),
-    );
-  }, [actions, query]);
-
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
+    const handleKeyboard = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setOpen((current) => !current);
         return;
       }
+
       if (event.key === "Escape") {
-        setOpen(false);
+        closeCommandCenter();
         return;
       }
-      if (event.altKey) {
-        const shortcutMap: Record<string, string> = {
-          "1": "overview",
-          "2": "reports",
-          "3": "analytics",
-          "4": "roads",
-          "5": "model",
-          "6": "authority",
-          r: "report",
-        };
-        const actionId = shortcutMap[event.key.toLowerCase()];
-        const action = actions.find((item) => item.id === actionId);
-        if (action) {
-          event.preventDefault();
-          runAndClose(action.run);
-        }
+
+      if (!event.altKey) return;
+
+      const shortcutTargets: Record<string, string> = {
+        "1": "Live overview",
+        "2": "Hazard reports",
+        "3": "City analytics",
+        "4": "Road intelligence",
+        "5": "AI model",
+        "6": "Authority console",
+        r: "Report a hazard",
+      };
+      const target = shortcutTargets[event.key.toLowerCase()];
+      if (target) {
+        event.preventDefault();
+        activateButton(target);
+        closeCommandCenter();
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [actions, runAndClose]);
+    window.addEventListener("keydown", handleKeyboard);
+    return () => window.removeEventListener("keydown", handleKeyboard);
+  }, []);
 
-  const installApp = async () => {
-    if (!installPrompt) return;
-    await installPrompt.prompt();
-    await installPrompt.userChoice;
-    setInstallPrompt(null);
-  };
+  const needle = query.trim().toLowerCase();
+  const filteredCommands = navigationCommands.filter((command) =>
+    `${command.label} ${command.description}`.toLowerCase().includes(needle),
+  );
 
   const healthLabel =
     health === "healthy"
@@ -269,9 +214,7 @@ export default function OperationsEnhancer() {
 
   return (
     <>
-      <a className="ops-skip-link" href="#main-content">
-        Skip to main content
-      </a>
+      <a className="ops-skip-link" href="#main-content">Skip to main content</a>
 
       {health === "offline" && (
         <div className="ops-offline-banner" role="status">
@@ -281,6 +224,7 @@ export default function OperationsEnhancer() {
 
       <div className="ops-dock" aria-label="CivicLens quick operations">
         <button
+          type="button"
           className={`ops-health-pill ops-health-${health}`}
           onClick={() => void checkHealth()}
           title="Refresh system health"
@@ -289,7 +233,7 @@ export default function OperationsEnhancer() {
           <span>{healthLabel}</span>
           <RefreshCw className={health === "checking" ? "ops-spin" : ""} size={13} />
         </button>
-        <button className="ops-command-button" onClick={() => setOpen(true)} aria-label="Open command center">
+        <button type="button" className="ops-command-button" onClick={() => setOpen(true)}>
           <Command size={17} />
           <span>Command center</span>
           <kbd>Ctrl K</kbd>
@@ -297,14 +241,8 @@ export default function OperationsEnhancer() {
       </div>
 
       {open && (
-        <div className="ops-command-backdrop" role="presentation" onMouseDown={() => setOpen(false)}>
-          <section
-            className="ops-command-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-label="CivicLens command center"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
+        <div className="ops-command-backdrop">
+          <section className="ops-command-panel" role="dialog" aria-modal="true" aria-label="CivicLens command center">
             <header className="ops-command-head">
               <div>
                 <span className="ops-command-icon"><Command size={18} /></span>
@@ -313,7 +251,7 @@ export default function OperationsEnhancer() {
                   <small>Navigate, verify services and launch common actions</small>
                 </div>
               </div>
-              <button onClick={() => setOpen(false)} aria-label="Close command center"><X size={17} /></button>
+              <button type="button" onClick={closeCommandCenter} aria-label="Close command center"><X size={17} /></button>
             </header>
 
             <label className="ops-command-search">
@@ -322,7 +260,7 @@ export default function OperationsEnhancer() {
                 autoFocus
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search actions, workspaces or system tools…"
+                placeholder="Search actions or workspaces…"
               />
               <kbd>ESC</kbd>
             </label>
@@ -338,36 +276,46 @@ export default function OperationsEnhancer() {
                 <span className="ops-health-orb"><Activity size={17} /></span>
                 <div>
                   <small>D1 latency</small>
-                  <strong>{healthPayload?.database?.latencyMs ?? "—"}{healthPayload?.database?.latencyMs != null ? " ms" : ""}</strong>
+                  <strong>{payload?.database?.latencyMs ?? "—"}{payload?.database?.latencyMs != null ? " ms" : ""}</strong>
                 </div>
               </article>
               <article>
                 <span className="ops-health-orb"><Bot size={17} /></span>
-                <div><small>Inference</small><strong>{healthPayload?.inference?.mode ?? "Demo adapter"}</strong></div>
+                <div><small>Inference</small><strong>{payload?.inference?.mode ?? "Demo adapter"}</strong></div>
               </article>
             </div>
 
-            <div className="ops-action-list" role="listbox" aria-label="Available commands">
-              {filteredActions.length ? filteredActions.map((action) => {
-                const Icon = action.icon;
+            <div className="ops-action-list">
+              {filteredCommands.length ? filteredCommands.map((command) => {
+                const Icon = command.icon;
                 return (
-                  <button key={action.id} onClick={() => runAndClose(action.run)}>
+                  <button type="button" key={command.id} onClick={() => runNavigation(command.target)}>
                     <span><Icon size={17} /></span>
-                    <div><strong>{action.label}</strong><small>{action.description}</small></div>
-                    {action.shortcut && <kbd>{action.shortcut}</kbd>}
+                    <div><strong>{command.label}</strong><small>{command.description}</small></div>
+                    <kbd>{command.shortcut}</kbd>
                   </button>
                 );
-              }) : (
-                <div className="ops-empty-command">No command matches “{query}”.</div>
-              )}
+              }) : <div className="ops-empty-command">No command matches “{query}”.</div>}
+
+              <button type="button" onClick={() => runNavigation("Report a hazard")}>
+                <span><Plus size={17} /></span>
+                <div><strong>Report a new hazard</strong><small>Open the citizen evidence and verification workflow.</small></div>
+                <kbd>Alt+R</kbd>
+              </button>
+              <button type="button" onClick={() => runNavigation("Export report")}>
+                <span><Download size={17} /></span>
+                <div><strong>Export hazard report</strong><small>Download the current operational dataset as CSV.</small></div>
+              </button>
+              <button type="button" onClick={() => window.open("/api/reports", "_blank", "noopener,noreferrer")}>
+                <span><ExternalLink size={17} /></span>
+                <div><strong>Open report API</strong><small>Inspect the live JSON report endpoint.</small></div>
+              </button>
             </div>
 
             <footer className="ops-command-foot">
-              <span><Keyboard size={14} /> Use arrow keys or shortcuts for faster operations.</span>
+              <span><Keyboard size={14} /> Use Ctrl+K or Alt+1…6 for faster operations.</span>
               <div>
-                {installPrompt && (
-                  <button onClick={() => void installApp()}><Smartphone size={14} /> Install app</button>
-                )}
+                <button type="button" onClick={() => void checkHealth()}><RefreshCw size={14} /> Recheck</button>
                 <small>{lastChecked ? `Checked ${lastChecked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Not checked yet"}</small>
               </div>
             </footer>
