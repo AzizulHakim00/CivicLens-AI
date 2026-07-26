@@ -9,7 +9,8 @@
     "enabled": true
   },
   "assets": {
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    "not_found_handling": "none"
   },
   "d1_databases": [
     {
