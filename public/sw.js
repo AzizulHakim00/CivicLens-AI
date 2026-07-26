@@ -1,3 +1,5 @@
+/* global self, caches, fetch, Response, URL */
+
 const CACHE_NAME = "civiclens-shell-v3";
 const STATIC_ASSETS = ["/", "/favicon.svg", "/manifest.webmanifest"];
 
