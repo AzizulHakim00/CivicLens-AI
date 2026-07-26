@@ -1,4 +1,5 @@
 import { Home, MapPinned } from "lucide-react";
+import Link from "next/link";
 
 export default function NotFound() {
   return (
@@ -8,7 +9,7 @@ export default function NotFound() {
         <h1>Workspace not found</h1>
         <p>The requested CivicLens route does not exist or may have moved. Return to the live urban hazard dashboard.</p>
         <div className="ops-state-actions">
-          <a href="/"><Home size={14} /> Open dashboard</a>
+          <Link href="/"><Home size={14} /> Open dashboard</Link>
         </div>
       </section>
     </main>
