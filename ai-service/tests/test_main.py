@@ -9,6 +9,7 @@ def test_health_reports_demo_mode():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+    assert len(client.get("/model-info").json()["classes"]) == 8
 
 
 def test_rejects_non_image():

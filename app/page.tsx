@@ -8,42 +8,92 @@ import {
   BarChart3,
   Bell,
   Bot,
+  Boxes,
+  Building2,
+  CalendarClock,
   Camera,
+  Car,
   Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   CircleDot,
+  CloudRain,
   Clock3,
+  Construction,
+  Cpu,
+  Database,
   Download,
   Eye,
   FileText,
   Filter,
+  FlaskConical,
   Gauge,
+  GitBranch,
+  HardHat,
   Layers3,
+  ListChecks,
   LocateFixed,
   Map,
   MapPin,
+  MapPinned,
   Menu,
+  Milestone,
   Navigation,
+  Pause,
+  Play,
   Plus,
+  Radio,
   Recycle,
   Route,
+  ScanSearch,
   Search,
+  Send,
+  Server,
+  Settings2,
+  ShieldAlert,
   ShieldCheck,
+  Siren,
+  SlidersHorizontal,
   Sparkles,
+  Target,
+  Timer,
+  TrafficCone,
   TrendingUp,
   UploadCloud,
+  UserCheck,
+  Users,
   Waves,
+  Workflow,
+  Wrench,
   X,
   Zap,
 } from "lucide-react";
-import { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
-type HazardType = "Pothole" | "Plastic waste" | "Waterlogging" | "Open manhole";
+type HazardType =
+  | "Pothole"
+  | "Plastic waste"
+  | "Waterlogging"
+  | "Open manhole"
+  | "Broken road"
+  | "Illegal dumping"
+  | "Traffic obstruction"
+  | "Damaged streetlight";
 type Severity = "Critical" | "High" | "Medium" | "Low";
 type ReportStatus = "Reported" | "Investigating" | "Resolved";
-type View = "overview" | "reports" | "analytics";
+type View = "overview" | "reports" | "analytics" | "roads" | "model" | "authority";
+
+const hazardTypes: HazardType[] = [
+  "Pothole",
+  "Plastic waste",
+  "Waterlogging",
+  "Open manhole",
+  "Broken road",
+  "Illegal dumping",
+  "Traffic obstruction",
+  "Damaged streetlight",
+];
 
 type HazardReport = {
   id: string;
@@ -58,6 +108,9 @@ type HazardReport = {
   y: number;
   reports: number;
   coverage: number;
+  assignedTeam: string;
+  slaMinutes: number;
+  source: "Citizen" | "Dashcam" | "CCTV" | "Drone";
 };
 
 const seedReports: HazardReport[] = [
@@ -74,6 +127,9 @@ const seedReports: HazardReport[] = [
     y: 45,
     reports: 7,
     coverage: 34,
+    assignedTeam: "Road Alpha",
+    slaMinutes: 42,
+    source: "Dashcam",
   },
   {
     id: "CL-2839",
@@ -88,6 +144,9 @@ const seedReports: HazardReport[] = [
     y: 25,
     reports: 4,
     coverage: 28,
+    assignedTeam: "Drainage 2",
+    slaMinutes: 118,
+    source: "CCTV",
   },
   {
     id: "CL-2836",
@@ -102,6 +161,9 @@ const seedReports: HazardReport[] = [
     y: 52,
     reports: 3,
     coverage: 18,
+    assignedTeam: "Clean City 4",
+    slaMinutes: 204,
+    source: "Citizen",
   },
   {
     id: "CL-2831",
@@ -116,6 +178,9 @@ const seedReports: HazardReport[] = [
     y: 67,
     reports: 5,
     coverage: 22,
+    assignedTeam: "Rapid Works",
+    slaMinutes: 61,
+    source: "Citizen",
   },
   {
     id: "CL-2827",
@@ -130,6 +195,43 @@ const seedReports: HazardReport[] = [
     y: 73,
     reports: 2,
     coverage: 9,
+    assignedTeam: "Road Beta",
+    slaMinutes: 0,
+    source: "Drone",
+  },
+  {
+    id: "CL-2824",
+    type: "Damaged streetlight",
+    severity: "Medium",
+    confidence: 90,
+    location: "Airport Road, Nikunja",
+    area: "Khilkhet",
+    time: "3 hr ago",
+    status: "Reported",
+    x: 84,
+    y: 34,
+    reports: 2,
+    coverage: 12,
+    assignedTeam: "Electrical 1",
+    slaMinutes: 236,
+    source: "CCTV",
+  },
+  {
+    id: "CL-2818",
+    type: "Illegal dumping",
+    severity: "High",
+    confidence: 93,
+    location: "Beribadh Road",
+    area: "Gabtoli",
+    time: "4 hr ago",
+    status: "Investigating",
+    x: 20,
+    y: 31,
+    reports: 6,
+    coverage: 31,
+    assignedTeam: "Clean City 2",
+    slaMinutes: 97,
+    source: "Drone",
   },
 ];
 
@@ -144,7 +246,11 @@ function TypeIcon({ type, size = 16 }: { type: HazardType; size?: number }) {
   if (type === "Pothole") return <CircleDot size={size} />;
   if (type === "Plastic waste") return <Recycle size={size} />;
   if (type === "Waterlogging") return <Waves size={size} />;
-  return <AlertTriangle size={size} />;
+  if (type === "Open manhole") return <AlertTriangle size={size} />;
+  if (type === "Broken road") return <Construction size={size} />;
+  if (type === "Illegal dumping") return <Boxes size={size} />;
+  if (type === "Traffic obstruction") return <TrafficCone size={size} />;
+  return <Zap size={size} />;
 }
 
 function SeverityPill({ severity }: { severity: Severity }) {
@@ -169,7 +275,35 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [showReport, setShowReport] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [toast, setToast] = useState("");
+
+  const viewMeta: Record<View, { title: string; description: string }> = {
+    overview: {
+      title: "Urban hazard intelligence",
+      description: "Monitor, verify and resolve road risks with explainable AI.",
+    },
+    reports: {
+      title: "Hazard report center",
+      description: `${reports.length} verified signals across the city network.`,
+    },
+    analytics: {
+      title: "City risk analytics",
+      description: "Decision-ready patterns from field reports and model detections.",
+    },
+    roads: {
+      title: "Road intelligence",
+      description: "Predict corridor risk, plan maintenance and protect mobility.",
+    },
+    model: {
+      title: "AI model operations",
+      description: "Inspect data quality, drift, thresholds and deployment readiness.",
+    },
+    authority: {
+      title: "Authority command center",
+      description: "Assign teams, manage SLA risk and coordinate field resolution.",
+    },
+  };
 
   const filteredReports = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -183,6 +317,44 @@ export default function Home() {
           report.id.toLowerCase().includes(needle)),
     );
   }, [reports, search, severityFilter, typeFilter]);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/reports")
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((payload: { reports?: Array<Record<string, unknown>> }) => {
+        if (!active || !payload.reports?.length) return;
+        const stored = payload.reports.map((row, index): HazardReport => {
+          const id = String(row.id ?? `CL-${2900 + index}`);
+          const hash = id.split("").reduce((sum, value) => sum + value.charCodeAt(0), 0);
+          return {
+            id,
+            type: String(row.type ?? "Pothole") as HazardType,
+            severity: String(row.severity ?? "Medium") as Severity,
+            confidence: Number(row.confidence ?? 90),
+            location: String(row.location ?? "Dhaka"),
+            area: String(row.area ?? "Dhaka"),
+            time: "Stored report",
+            status: String(row.status ?? "Reported") as ReportStatus,
+            x: 18 + (hash % 68),
+            y: 18 + ((hash * 7) % 62),
+            reports: Number(row.nearbyReports ?? 1),
+            coverage: Number(row.coverage ?? 10),
+            assignedTeam: String(row.assignedTeam ?? "Unassigned"),
+            slaMinutes: Number(row.slaMinutes ?? 240),
+            source: String(row.source ?? "Citizen") as HazardReport["source"],
+          };
+        });
+        setReports((current) => {
+          const storedIds = new Set(stored.map((report) => report.id));
+          return [...stored, ...current.filter((report) => !storedIds.has(report.id))];
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const notify = (message: string) => {
     setToast(message);
@@ -200,7 +372,23 @@ export default function Home() {
           : "Reported";
     setReports((items) => items.map((item) => (item.id === id ? { ...item, status: next } : item)));
     setSelected({ ...current, status: next });
+    fetch("/api/reports", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, status: next }),
+    }).catch(() => undefined);
     notify(`${id} moved to ${next}`);
+  };
+
+  const assignTeam = (id: string, assignedTeam: string) => {
+    setReports((items) => items.map((item) => (item.id === id ? { ...item, assignedTeam } : item)));
+    if (selected.id === id) setSelected((current) => ({ ...current, assignedTeam }));
+    fetch("/api/reports", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, assignedTeam }),
+    }).catch(() => undefined);
+    notify(`${assignedTeam} assigned to ${id}`);
   };
 
   const exportCsv = () => {
@@ -258,7 +446,12 @@ export default function Home() {
             <span />
             AI systems operational
           </div>
-          <button className="icon-button" aria-label="Notifications">
+          <button
+            className="icon-button"
+            aria-label="Notifications"
+            aria-expanded={showNotifications}
+            onClick={() => setShowNotifications((open) => !open)}
+          >
             <Bell size={18} />
             <i>3</i>
           </button>
@@ -271,6 +464,28 @@ export default function Home() {
             <ChevronDown size={14} />
           </div>
         </div>
+        {showNotifications && (
+          <div className="notification-popover">
+            <div>
+              <strong>Operations alerts</strong>
+              <button onClick={() => setShowNotifications(false)} aria-label="Close notifications">
+                <X size={15} />
+              </button>
+            </div>
+            <button onClick={() => { setView("authority"); setShowNotifications(false); }}>
+              <span className="alert-icon critical"><Siren size={15} /></span>
+              <span><strong>Critical SLA risk</strong><small>CL-2841 has 42 minutes remaining</small></span>
+            </button>
+            <button onClick={() => { setView("roads"); setShowNotifications(false); }}>
+              <span className="alert-icon high"><CloudRain size={15} /></span>
+              <span><strong>Flood-risk corridor</strong><small>Kazi Nazrul Avenue risk increased 18%</small></span>
+            </button>
+            <button onClick={() => { setView("model"); setShowNotifications(false); }}>
+              <span className="alert-icon medium"><Cpu size={15} /></span>
+              <span><strong>Model drift watch</strong><small>Night-scene confidence is below target</small></span>
+            </button>
+          </div>
+        )}
       </header>
 
       <aside className="sidebar">
@@ -288,17 +503,17 @@ export default function Home() {
           <BarChart3 size={18} />
           City analytics
         </button>
-        <button>
+        <button className={view === "roads" ? "active" : ""} onClick={() => setView("roads")}>
           <Route size={18} />
           Road intelligence
         </button>
         <div className="side-label spaced">System</div>
-        <button>
+        <button className={view === "model" ? "active" : ""} onClick={() => setView("model")}>
           <Bot size={18} />
           AI model
           <span className="live-dot" />
         </button>
-        <button>
+        <button className={view === "authority" ? "active" : ""} onClick={() => setView("authority")}>
           <ShieldCheck size={18} />
           Authority console
         </button>
@@ -316,8 +531,8 @@ export default function Home() {
         <div className="sidebar-foot">
           <span>CL</span>
           <div>
-            <strong>CivicLens v1.4</strong>
-            <small>ONNX adapter ready</small>
+            <strong>CivicLens v2.0</strong>
+            <small>8-class platform</small>
           </div>
         </div>
       </aside>
@@ -328,14 +543,8 @@ export default function Home() {
             <p className="eyebrow">
               <span /> LIVE CITY PULSE · DHAKA
             </p>
-            <h1>{view === "overview" ? "Urban hazard intelligence" : view === "reports" ? "Hazard report center" : "City risk analytics"}</h1>
-            <p>
-              {view === "overview"
-                ? "Monitor, verify and resolve road risks with explainable AI."
-                : view === "reports"
-                  ? `${reports.length} verified signals across the city network.`
-                  : "Decision-ready patterns from field reports and model detections."}
-            </p>
+            <h1>{viewMeta[view].title}</h1>
+            <p>{viewMeta[view].description}</p>
           </div>
           <div className="head-actions">
             <button className="secondary-button" onClick={exportCsv}>
@@ -638,6 +847,16 @@ export default function Home() {
         )}
 
         {view === "analytics" && <AnalyticsView />}
+        {view === "roads" && <RoadIntelligenceView notify={notify} />}
+        {view === "model" && <ModelOperationsView notify={notify} />}
+        {view === "authority" && (
+          <AuthorityConsoleView
+            reports={reports}
+            updateStatus={updateStatus}
+            assignTeam={assignTeam}
+            notify={notify}
+          />
+        )}
       </section>
 
       {showReport && (
@@ -692,10 +911,9 @@ function ReportsView({
             <Filter size={15} />
             <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)}>
               <option>All</option>
-              <option>Pothole</option>
-              <option>Plastic waste</option>
-              <option>Waterlogging</option>
-              <option>Open manhole</option>
+              {hazardTypes.map((type) => (
+                <option key={type}>{type}</option>
+              ))}
             </select>
           </label>
         </div>
@@ -906,6 +1124,434 @@ function AnalyticsView() {
   );
 }
 
+function RoadIntelligenceView({ notify }: { notify: (message: string) => void }) {
+  const [scenario, setScenario] = useState("Heavy rain");
+  const [simulating, setSimulating] = useState(false);
+  const corridors = [
+    {
+      name: "Mirpur Road",
+      segment: "Science Lab → Technical",
+      risk: 86,
+      condition: "Critical",
+      hazards: 18,
+      traffic: "Heavy",
+      due: "12 days",
+      icon: Construction,
+      color: "#f24e64",
+    },
+    {
+      name: "Kazi Nazrul Avenue",
+      segment: "Farmgate → Shahbag",
+      risk: 74,
+      condition: "Watch",
+      hazards: 11,
+      traffic: "Moderate",
+      due: "26 days",
+      icon: CloudRain,
+      color: "#ff9f43",
+    },
+    {
+      name: "Airport Road",
+      segment: "Banani → Khilkhet",
+      risk: 52,
+      condition: "Stable",
+      hazards: 7,
+      traffic: "Heavy",
+      due: "48 days",
+      icon: Car,
+      color: "#ffc857",
+    },
+    {
+      name: "Gulshan Avenue",
+      segment: "Circle 1 → Circle 2",
+      risk: 31,
+      condition: "Healthy",
+      hazards: 3,
+      traffic: "Light",
+      due: "82 days",
+      icon: Route,
+      color: "#23d2ac",
+    },
+  ];
+
+  const runSimulation = () => {
+    setSimulating(true);
+    window.setTimeout(() => {
+      setSimulating(false);
+      notify(`${scenario} scenario complete · 2 corridors reprioritized`);
+    }, 1250);
+  };
+
+  return (
+    <section className="roads-workspace">
+      <div className="road-kpis">
+        <article className="panel road-kpi">
+          <span className="stat-icon coral"><MapPinned size={19} /></span>
+          <div><small>Monitored network</small><strong>147.8 km</strong><p>12 priority corridors</p></div>
+        </article>
+        <article className="panel road-kpi">
+          <span className="stat-icon violet"><Gauge size={19} /></span>
+          <div><small>Network health</small><strong>72 / 100</strong><p>4 points below target</p></div>
+        </article>
+        <article className="panel road-kpi">
+          <span className="stat-icon cyan"><Radio size={19} /></span>
+          <div><small>Edge sensors</small><strong>38 / 42</strong><p>90.5% online</p></div>
+        </article>
+        <article className="panel road-kpi">
+          <span className="stat-icon green"><Wrench size={19} /></span>
+          <div><small>Prevented repairs</small><strong>৳1.28M</strong><p>Estimated this quarter</p></div>
+        </article>
+      </div>
+
+      <div className="roads-main-grid">
+        <article className="panel corridor-panel">
+          <div className="panel-head">
+            <div>
+              <h2>Corridor condition index</h2>
+              <p>Predicted risk from hazards, weather and traffic pressure</p>
+            </div>
+            <button className="mini-select"><SlidersHorizontal size={14} /> Risk weighted</button>
+          </div>
+          <div className="corridor-list">
+            {corridors.map((corridor) => {
+              const CorridorIcon = corridor.icon;
+              return (
+                <div className="corridor-row" key={corridor.name}>
+                  <span className="corridor-icon" style={{ color: corridor.color }}>
+                    <CorridorIcon size={18} />
+                  </span>
+                  <div className="corridor-copy">
+                    <span><strong>{corridor.name}</strong><small>{corridor.segment}</small></span>
+                    <div className="condition-track"><i style={{ width: `${corridor.risk}%`, background: corridor.color }} /></div>
+                  </div>
+                  <div className="corridor-number"><strong>{corridor.risk}</strong><small>risk</small></div>
+                  <div className="corridor-meta"><span>{corridor.hazards} hazards</span><span>{corridor.traffic} traffic</span></div>
+                  <div className="corridor-due"><CalendarClock size={14} /><span><small>Maintenance</small><strong>{corridor.due}</strong></span></div>
+                </div>
+              );
+            })}
+          </div>
+        </article>
+
+        <article className="panel scenario-panel">
+          <div className="panel-head">
+            <div><h2>Mobility scenario lab</h2><p>Test operational conditions before dispatch</p></div>
+            <FlaskConical size={20} />
+          </div>
+          <div className="scenario-visual">
+            <span className="route-line one" />
+            <span className="route-line two" />
+            <span className="route-node a"><Building2 size={15} /></span>
+            <span className="route-node b"><TrafficCone size={15} /></span>
+            <span className="route-node c"><MapPin size={15} /></span>
+            <div>
+              <CloudRain size={26} />
+              <strong>{scenario}</strong>
+              <small>Projected network pressure +18%</small>
+            </div>
+          </div>
+          <label className="scenario-select">
+            <span>Simulation condition</span>
+            <select value={scenario} onChange={(event) => setScenario(event.target.value)}>
+              <option>Heavy rain</option>
+              <option>Clear weekday</option>
+              <option>Event traffic</option>
+              <option>Drainage outage</option>
+            </select>
+          </label>
+          <div className="scenario-result">
+            <span><strong>2</strong><small>routes at risk</small></span>
+            <span><strong>+14m</strong><small>response delay</small></span>
+            <span><strong>3</strong><small>teams suggested</small></span>
+          </div>
+          <button className="primary-button full" onClick={runSimulation} disabled={simulating}>
+            {simulating ? <Pause size={16} /> : <Play size={16} />}
+            {simulating ? "Running simulation…" : "Run route simulation"}
+          </button>
+        </article>
+      </div>
+
+      <div className="road-bottom-grid">
+        <article className="panel maintenance-panel">
+          <div className="panel-head">
+            <div><h2>Predictive maintenance queue</h2><p>Recommended work before condition failure</p></div>
+            <Milestone size={19} />
+          </div>
+          {[
+            ["Mirpur Road · Zone 4", "Pothole cluster resurfacing", "92", "Within 12 days"],
+            ["Satmasjid Road · Zone 2", "Manhole cover reinforcement", "84", "Within 18 days"],
+            ["Airport Road · Zone 7", "Streetlight circuit inspection", "71", "Within 31 days"],
+          ].map(([road, task, score, due]) => (
+            <div className="maintenance-row" key={road}>
+              <span className="maintenance-score">{score}</span>
+              <div><strong>{road}</strong><p>{task}</p></div>
+              <span><Timer size={13} /> {due}</span>
+              <button onClick={() => notify(`${task} added to the maintenance plan`)}>Plan work</button>
+            </div>
+          ))}
+        </article>
+        <article className="panel sensor-panel">
+          <div className="panel-head"><div><h2>Sensor network</h2><p>Live ingestion health</p></div><Radio size={18} /></div>
+          <div className="sensor-ring"><span><strong>90.5%</strong><small>online</small></span></div>
+          <div className="sensor-sources">
+            <span><Camera size={14} /> Dashcams <b>18</b></span>
+            <span><ScanSearch size={14} /> CCTV feeds <b>12</b></span>
+            <span><Navigation size={14} /> Drone routes <b>8</b></span>
+          </div>
+        </article>
+      </div>
+    </section>
+  );
+}
+
+function ModelOperationsView({ notify }: { notify: (message: string) => void }) {
+  const [threshold, setThreshold] = useState(62);
+  const [running, setRunning] = useState(false);
+  const classQuality = [
+    ["Pothole", 93],
+    ["Plastic waste", 88],
+    ["Waterlogging", 91],
+    ["Open manhole", 86],
+    ["Broken road", 84],
+    ["Illegal dumping", 82],
+    ["Traffic obstruction", 80],
+    ["Damaged streetlight", 78],
+  ] as const;
+
+  const runContractTest = () => {
+    setRunning(true);
+    window.setTimeout(() => {
+      setRunning(false);
+      notify("ONNX contract test passed · model weights still required for measured accuracy");
+    }, 1400);
+  };
+
+  return (
+    <section className="model-ops">
+      <div className="model-status-banner">
+        <div className="model-status-orb"><Cpu size={28} /><span /></div>
+        <div>
+          <span className="model-badge"><span /> ADAPTER HEALTHY</span>
+          <h2>CivicLens Vision · production contract</h2>
+          <p>Eight-class ONNX pipeline, deterministic demo fallback and edge export workflow.</p>
+        </div>
+        <div className="model-banner-meta">
+          <span><small>Mode</small><strong>Demo adapter</strong></span>
+          <span><small>Runtime target</small><strong>ONNX CPU / Edge</strong></span>
+          <button onClick={runContractTest} disabled={running}>
+            {running ? <Pause size={15} /> : <Play size={15} />}
+            {running ? "Testing…" : "Run contract test"}
+          </button>
+        </div>
+      </div>
+
+      <div className="model-top-grid">
+        <article className="panel registry-panel">
+          <div className="panel-head"><div><h2>Model registry</h2><p>Promotion state and serving readiness</p></div><GitBranch size={18} /></div>
+          {[
+            { name: "Vision v1.4", state: "Production contract", target: "ONNX · 640px", color: "green", icon: Server },
+            { name: "Vision v1.5-rc", state: "Candidate", target: "RT-DETR · research", color: "violet", icon: FlaskConical },
+            { name: "Edge v0.9", state: "Export ready", target: "INT8 · mobile", color: "cyan", icon: Cpu },
+          ].map((model) => {
+            const ModelIcon = model.icon;
+            return (
+              <div className="registry-row" key={model.name}>
+                <span className={`registry-icon ${model.color}`}><ModelIcon size={17} /></span>
+                <div><strong>{model.name}</strong><small>{model.target}</small></div>
+                <span className={`registry-state ${model.color}`}>{model.state}</span>
+                <button aria-label={`Open ${model.name}`}><ChevronRight size={15} /></button>
+              </div>
+            );
+          })}
+        </article>
+        <article className="panel threshold-panel">
+          <div className="panel-head"><div><h2>Decision threshold</h2><p>Operator alert sensitivity</p></div><Settings2 size={18} /></div>
+          <div className="threshold-score"><strong>{threshold}%</strong><span>confidence floor</span></div>
+          <input
+            aria-label="Confidence threshold"
+            type="range"
+            min="35"
+            max="90"
+            value={threshold}
+            onChange={(event) => setThreshold(Number(event.target.value))}
+          />
+          <div className="threshold-labels"><span>More recall</span><span>More precision</span></div>
+          <div className="threshold-impact">
+            <span><Target size={15} /><small>Estimated review load</small><strong>{Math.max(18, 91 - threshold)} / day</strong></span>
+            <span><ShieldAlert size={15} /><small>Critical guardrail</small><strong>Always escalated</strong></span>
+          </div>
+        </article>
+      </div>
+
+      <div className="model-main-grid">
+        <article className="panel quality-panel">
+          <div className="panel-head">
+            <div><h2>Per-class quality targets</h2><p>Planning benchmarks until trained weights and held-out evaluation are connected</p></div>
+            <span className="target-label">TARGETS · NOT MEASURED</span>
+          </div>
+          <div className="quality-list">
+            {classQuality.map(([name, score]) => (
+              <div key={name}>
+                <span><TypeIcon type={name} /><strong>{name}</strong></span>
+                <div><i style={{ width: `${score}%` }} /></div>
+                <b>{score}%</b>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="panel data-health-panel">
+          <div className="panel-head"><div><h2>Data health</h2><p>Readiness checks for the training set</p></div><Database size={18} /></div>
+          <div className="data-score"><span><strong>6</strong><small>checks ready</small></span><CheckCircle2 size={25} /></div>
+          {[
+            ["Schema validation", "Ready", true],
+            ["YOLO label bounds", "Ready", true],
+            ["Train/val/test isolation", "Scripted", true],
+            ["Class balance", "Dataset needed", false],
+            ["Night-scene slice", "Dataset needed", false],
+            ["GPS privacy scrub", "Policy ready", true],
+          ].map(([label, value, ready]) => (
+            <div className="health-row" key={String(label)}>
+              <span className={ready ? "ready" : "waiting"}>{ready ? <Check size={12} /> : <Clock3 size={12} />}</span>
+              <strong>{label}</strong>
+              <small>{value}</small>
+            </div>
+          ))}
+        </article>
+      </div>
+
+      <article className="panel pipeline-panel">
+        <div className="panel-head"><div><h2>Production ML lifecycle</h2><p>Implemented repository path from raw evidence to monitored release</p></div><Workflow size={19} /></div>
+        <div className="pipeline-flow">
+          {[
+            [UploadCloud, "Dataset", "Validate YOLO labels"],
+            [FlaskConical, "Train", "Reproducible config"],
+            [ListChecks, "Evaluate", "mAP + error slices"],
+            [Cpu, "Export", "ONNX runtime"],
+            [Server, "Serve", "FastAPI contract"],
+            [Activity, "Monitor", "Drift + feedback"],
+          ].map(([Icon, title, note], index) => {
+            const StepIcon = Icon as typeof UploadCloud;
+            return (
+              <div className="pipeline-step" key={String(title)}>
+                <span><StepIcon size={17} /></span>
+                <div><strong>{title as string}</strong><small>{note as string}</small></div>
+                {index < 5 && <ChevronRight size={14} />}
+              </div>
+            );
+          })}
+        </div>
+      </article>
+    </section>
+  );
+}
+
+function AuthorityConsoleView({
+  reports,
+  updateStatus,
+  assignTeam,
+  notify,
+}: {
+  reports: HazardReport[];
+  updateStatus: (id: string) => void;
+  assignTeam: (id: string, team: string) => void;
+  notify: (message: string) => void;
+}) {
+  const teams = ["Unassigned", "Road Alpha", "Road Beta", "Drainage 2", "Clean City 4", "Rapid Works", "Electrical 1"];
+  const statuses: ReportStatus[] = ["Reported", "Investigating", "Resolved"];
+  const openCount = reports.filter((report) => report.status !== "Resolved").length;
+  const slaRisk = reports.filter((report) => report.status !== "Resolved" && report.slaMinutes < 90).length;
+
+  return (
+    <section className="authority-workspace">
+      <div className="authority-kpis">
+        <article className="panel"><span className="stat-icon coral"><Siren size={19} /></span><div><small>Open incidents</small><strong>{openCount}</strong><p>{slaRisk} need rapid response</p></div></article>
+        <article className="panel"><span className="stat-icon cyan"><HardHat size={19} /></span><div><small>Teams deployed</small><strong>11 / 15</strong><p>73% field utilization</p></div></article>
+        <article className="panel"><span className="stat-icon violet"><Timer size={19} /></span><div><small>Median response</small><strong>3h 24m</strong><p>18 minutes faster today</p></div></article>
+        <article className="panel"><span className="stat-icon green"><UserCheck size={19} /></span><div><small>Citizen updates</small><strong>96%</strong><p>Delivered successfully</p></div></article>
+      </div>
+
+      <div className="command-grid">
+        <article className="panel dispatch-board">
+          <div className="panel-head">
+            <div><h2>Live response board</h2><p>Assign ownership and advance verified incidents</p></div>
+            <button className="mini-select" onClick={() => notify("Dispatch plan synchronized")}><Send size={14} /> Sync dispatch</button>
+          </div>
+          <div className="kanban-board">
+            {statuses.map((status) => (
+              <div className="kanban-column" key={status}>
+                <div className="kanban-head">
+                  <span className={`kanban-dot ${status.toLowerCase()}`} />
+                  <strong>{status}</strong>
+                  <small>{reports.filter((report) => report.status === status).length}</small>
+                </div>
+                <div className="kanban-list">
+                  {reports.filter((report) => report.status === status).map((report) => (
+                    <article className={`dispatch-card severity-edge-${report.severity.toLowerCase()}`} key={report.id}>
+                      <div className="dispatch-title">
+                        <span className={`signal-icon signal-${report.severity.toLowerCase()}`}><TypeIcon type={report.type} /></span>
+                        <div><strong>{report.type}</strong><small>{report.id} · {report.source}</small></div>
+                        <SeverityPill severity={report.severity} />
+                      </div>
+                      <p><MapPin size={13} /> {report.area} · {report.location}</p>
+                      <div className="dispatch-meta">
+                        <span className={report.slaMinutes < 90 && report.status !== "Resolved" ? "sla-risk" : ""}>
+                          <Timer size={12} /> {report.status === "Resolved" ? "SLA met" : `${report.slaMinutes}m left`}
+                        </span>
+                        <span><Users size={12} /> {report.assignedTeam}</span>
+                      </div>
+                      <div className="dispatch-actions">
+                        <select
+                          aria-label={`Assign team to ${report.id}`}
+                          value={report.assignedTeam}
+                          onChange={(event) => assignTeam(report.id, event.target.value)}
+                        >
+                          {!teams.includes(report.assignedTeam) && <option>{report.assignedTeam}</option>}
+                          {teams.map((team) => <option key={team}>{team}</option>)}
+                        </select>
+                        <button onClick={() => updateStatus(report.id)}>
+                          {status === "Resolved" ? "Reopen" : "Advance"} <ChevronRight size={13} />
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <aside className="command-side">
+          <article className="panel field-teams">
+            <div className="panel-head"><div><h2>Field capacity</h2><p>Live team availability</p></div><HardHat size={18} /></div>
+            {[
+              ["Road engineering", 4, 5, "#f24e64"],
+              ["Drainage response", 2, 3, "#6f8df8"],
+              ["Clean city", 3, 4, "#23d2ac"],
+              ["Electrical", 2, 3, "#ffc857"],
+            ].map(([name, active, total, color]) => (
+              <div className="team-capacity" key={String(name)}>
+                <span><strong>{name}</strong><small>{active} of {total} deployed</small></span>
+                <div><i style={{ width: `${(Number(active) / Number(total)) * 100}%`, background: String(color) }} /></div>
+              </div>
+            ))}
+          </article>
+          <article className="panel escalation-panel">
+            <div className="panel-head"><div><h2>Escalation watch</h2><p>Action required next</p></div><ShieldAlert size={18} /></div>
+            {reports.filter((report) => report.status !== "Resolved").sort((a, b) => a.slaMinutes - b.slaMinutes).slice(0, 3).map((report) => (
+              <button key={report.id} onClick={() => notify(`${report.id} escalation acknowledged`)}>
+                <span className="alert-icon critical"><Siren size={14} /></span>
+                <span><strong>{report.id} · {report.area}</strong><small>{report.slaMinutes}m remaining · {report.assignedTeam}</small></span>
+                <ChevronRight size={14} />
+              </button>
+            ))}
+          </article>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
 function ReportModal({
   onClose,
   onCreated,
@@ -950,8 +1596,7 @@ function ReportModal({
     }
     setStep("scanning");
     const hash = fileName.split("").reduce((total, letter) => total + letter.charCodeAt(0), 0);
-    const types: HazardType[] = ["Pothole", "Plastic waste", "Waterlogging", "Open manhole"];
-    const nextType = types[hash % types.length];
+    const nextType = hazardTypes[hash % hazardTypes.length];
     const nextConfidence = 89 + (hash % 9);
     const nextSeverity: Severity = nextConfidence > 95 ? "Critical" : nextConfidence > 91 ? "High" : "Medium";
     window.setTimeout(() => {
@@ -978,6 +1623,9 @@ function ReportModal({
       y: 32 + Math.floor(Math.random() * 28),
       reports: duplicate ? 2 : 1,
       coverage: Math.max(12, confidence - 67),
+      assignedTeam: "Unassigned",
+      slaMinutes: severity === "Critical" ? 60 : severity === "High" ? 180 : 360,
+      source: "Citizen",
     };
     try {
       await fetch("/api/reports", {
@@ -1113,10 +1761,9 @@ function ReportModal({
                 <label>
                   <span>Hazard type</span>
                   <select value={detectedType} onChange={(event) => setDetectedType(event.target.value as HazardType)}>
-                    <option>Pothole</option>
-                    <option>Plastic waste</option>
-                    <option>Waterlogging</option>
-                    <option>Open manhole</option>
+                    {hazardTypes.map((type) => (
+                      <option key={type}>{type}</option>
+                    ))}
                   </select>
                 </label>
                 <label>

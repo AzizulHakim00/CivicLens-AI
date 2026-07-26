@@ -1,4 +1,7 @@
 fastapi==0.116.1
+numpy>=1.26,<3
+onnxruntime>=1.19,<2
+opencv-python-headless>=4.10,<5
 pillow==11.3.0
 python-multipart==0.0.20
 uvicorn[standard]==0.35.0

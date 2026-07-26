@@ -1,0 +1,14 @@
+path: /absolute/path/to/civiclens-dataset
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: Pothole
+  1: Plastic waste
+  2: Waterlogging
+  3: Open manhole
+  4: Broken road
+  5: Illegal dumping
+  6: Traffic obstruction
+  7: Damaged streetlight

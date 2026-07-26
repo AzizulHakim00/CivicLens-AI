@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+/.pytest_cache/
+**/__pycache__/
+*.py[cod]
 
 # next.js
 /.next/
@@ -40,12 +43,3 @@ next-env.d.ts
 /.sites-runtime/
 /outputs/
 /work/
-
-# Python
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.venv/
-
-# Vinext generated cache
-.vinext/

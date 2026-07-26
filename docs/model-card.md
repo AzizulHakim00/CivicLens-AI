@@ -12,6 +12,10 @@ Object detection for road-scene hazards:
 - plastic waste
 - waterlogging
 - open manhole
+- broken road
+- illegal dumping
+- traffic obstruction
+- damaged streetlight
 
 ## Recommended training protocol
 
@@ -19,6 +23,8 @@ Object detection for road-scene hazards:
 - Report mAP@50, mAP@50–95, per-class precision/recall, confusion matrix, latency, and model size.
 - Evaluate separate slices for rain, night, glare, occlusion, low-resolution cameras, and road material.
 - Keep a locked test set and record all dataset versions.
+- Run `training/validate_dataset.py` before each experiment and retain its JSON report.
+- Use `training/evaluate_yolo.py` only on the held-out test split after model selection is complete.
 
 ## Severity
 

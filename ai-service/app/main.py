@@ -3,24 +3,43 @@ from __future__ import annotations
 import hashlib
 import io
 import os
+import tempfile
 import time
 from typing import Annotated, Literal
 
+import cv2
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, Field
 
-HazardType = Literal["Pothole", "Plastic waste", "Waterlogging", "Open manhole"]
+from .inference import OnnxDetector
+
+HazardType = Literal[
+    "Pothole",
+    "Plastic waste",
+    "Waterlogging",
+    "Open manhole",
+    "Broken road",
+    "Illegal dumping",
+    "Traffic obstruction",
+    "Damaged streetlight",
+]
 Severity = Literal["Critical", "High", "Medium", "Low"]
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
+MAX_VIDEO_BYTES = 64 * 1024 * 1024
 CLASSES: tuple[HazardType, ...] = (
     "Pothole",
     "Plastic waste",
     "Waterlogging",
     "Open manhole",
+    "Broken road",
+    "Illegal dumping",
+    "Traffic obstruction",
+    "Damaged streetlight",
 )
 MODEL_PATH = os.getenv("MODEL_PATH")
+_detector: OnnxDetector | None = None
 
 
 class BoundingBox(BaseModel):
@@ -44,6 +63,21 @@ class PredictionResponse(BaseModel):
     height: int
     inference_ms: float
     detections: list[Detection]
+
+
+class VideoFrameResult(BaseModel):
+    frame: int
+    timestamp_seconds: float
+    detections: list[Detection]
+
+
+class VideoPredictionResponse(BaseModel):
+    mode: Literal["demo", "onnx"]
+    sampled_frames: int
+    source_fps: float
+    duration_seconds: float
+    inference_ms: float
+    frames: list[VideoFrameResult]
 
 
 app = FastAPI(
@@ -82,6 +116,33 @@ def demo_predict(payload: bytes, width: int, height: int) -> list[Detection]:
             explanation="Demo adapter: central road-region evidence contributed most to the deterministic result.",
         )
     ]
+
+
+def get_detector() -> OnnxDetector:
+    global _detector
+    if not MODEL_PATH:
+        raise RuntimeError("MODEL_PATH is not configured.")
+    if _detector is None:
+        _detector = OnnxDetector(MODEL_PATH, CLASSES)
+    return _detector
+
+
+def onnx_predict(image: Image.Image) -> list[Detection]:
+    results: list[Detection] = []
+    width, height = image.size
+    for raw in get_detector().predict(image):
+        x1, y1, x2, y2 = raw.box
+        coverage = ((x2 - x1) * (y2 - y1)) / max(1, width * height)
+        results.append(
+            Detection(
+                class_name=raw.class_name,
+                confidence=raw.confidence,
+                severity=severity_from(raw.confidence, min(1.0, coverage * 3.2)),
+                box=BoundingBox(x1=x1, y1=y1, x2=x2, y2=y2),
+                explanation="ONNX detection: the returned bounding region exceeded the configured confidence threshold.",
+            )
+        )
+    return results
 
 
 @app.get("/health")
@@ -123,17 +184,89 @@ async def predict_image(
 
     started = time.perf_counter()
     if MODEL_PATH:
-        raise HTTPException(
-            status_code=501,
-            detail="MODEL_PATH is configured; implement model-specific preprocessing and output decoding before enabling ONNX mode.",
-        )
-    detections = demo_predict(payload, width, height)
+        try:
+            with Image.open(io.BytesIO(payload)) as image:
+                detections = onnx_predict(image)
+        except RuntimeError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+    else:
+        detections = demo_predict(payload, width, height)
     elapsed = (time.perf_counter() - started) * 1000
 
     return PredictionResponse(
-        mode="demo",
+        mode="onnx" if MODEL_PATH else "demo",
         width=width,
         height=height,
         inference_ms=round(elapsed, 3),
         detections=detections,
+    )
+
+
+@app.post("/predict-video", response_model=VideoPredictionResponse)
+async def predict_video(
+    file: Annotated[UploadFile, File(description="MP4, MOV, WEBM, or AVI road video")],
+) -> VideoPredictionResponse:
+    if file.content_type not in {
+        "video/mp4",
+        "video/quicktime",
+        "video/webm",
+        "video/x-msvideo",
+    }:
+        raise HTTPException(status_code=415, detail="Use an MP4, MOV, WEBM, or AVI video.")
+
+    payload = await file.read(MAX_VIDEO_BYTES + 1)
+    if len(payload) > MAX_VIDEO_BYTES:
+        raise HTTPException(status_code=413, detail="Video exceeds the 64 MB limit.")
+
+    suffix = os.path.splitext(file.filename or "upload.mp4")[1] or ".mp4"
+    started = time.perf_counter()
+    frames: list[VideoFrameResult] = []
+    with tempfile.NamedTemporaryFile(suffix=suffix) as temporary:
+        temporary.write(payload)
+        temporary.flush()
+        capture = cv2.VideoCapture(temporary.name)
+        fps = float(capture.get(cv2.CAP_PROP_FPS) or 0)
+        frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        if not capture.isOpened() or fps <= 0:
+            capture.release()
+            raise HTTPException(status_code=400, detail="The uploaded file is not a readable video.")
+
+        sample_interval = max(1, int(round(fps)))
+        index = 0
+        while len(frames) < 120:
+            ok, frame = capture.read()
+            if not ok:
+                break
+            if index % sample_interval == 0:
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                image = Image.fromarray(rgb)
+                if MODEL_PATH:
+                    try:
+                        detections = onnx_predict(image)
+                    except RuntimeError as error:
+                        capture.release()
+                        raise HTTPException(status_code=503, detail=str(error)) from error
+                else:
+                    ok_encode, encoded = cv2.imencode(".jpg", frame)
+                    if not ok_encode:
+                        index += 1
+                        continue
+                    detections = demo_predict(encoded.tobytes(), image.width, image.height)
+                frames.append(
+                    VideoFrameResult(
+                        frame=index,
+                        timestamp_seconds=round(index / fps, 3),
+                        detections=detections,
+                    )
+                )
+            index += 1
+        capture.release()
+
+    return VideoPredictionResponse(
+        mode="onnx" if MODEL_PATH else "demo",
+        sampled_frames=len(frames),
+        source_fps=round(fps, 3),
+        duration_seconds=round(frame_count / fps, 3),
+        inference_ms=round((time.perf_counter() - started) * 1000, 3),
+        frames=frames,
     )
