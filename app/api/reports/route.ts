@@ -110,6 +110,10 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const contentLength = Number(request.headers.get("content-length") ?? "0");
+    if (contentLength > 16_384) {
+      return Response.json({ error: "Payload is too large." }, { status: 413 });
+    }
     const body = (await request.json()) as Record<string, unknown>;
     const id = clean(body.id, 24);
     if (!/^CL-\d{4,8}$/.test(id)) {

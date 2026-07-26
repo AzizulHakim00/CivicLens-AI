@@ -82,3 +82,25 @@ test("rejects invalid workflow update before database access", async () => {
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), { error: "A valid report ID is required." });
 });
+
+test("rejects oversized workflow updates before parsing", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("patch-size-test", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const response = await worker.fetch(
+    new Request("http://localhost/api/reports", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "content-length": "16385",
+      },
+      body: JSON.stringify({ id: "CL-2841" }),
+    }),
+    {
+      ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
+    },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(response.status, 413);
+  assert.deepEqual(await response.json(), { error: "Payload is too large." });
+});

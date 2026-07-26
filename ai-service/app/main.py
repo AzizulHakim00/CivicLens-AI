@@ -218,7 +218,12 @@ async def predict_video(
     if len(payload) > MAX_VIDEO_BYTES:
         raise HTTPException(status_code=413, detail="Video exceeds the 64 MB limit.")
 
-    suffix = os.path.splitext(file.filename or "upload.mp4")[1] or ".mp4"
+    suffix = {
+        "video/mp4": ".mp4",
+        "video/quicktime": ".mov",
+        "video/webm": ".webm",
+        "video/x-msvideo": ".avi",
+    }[file.content_type]
     started = time.perf_counter()
     frames: list[VideoFrameResult] = []
     with tempfile.NamedTemporaryFile(suffix=suffix) as temporary:
