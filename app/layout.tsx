@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import CityMediaExperience from "./components/CityMediaExperience";
 import OperationsEnhancer from "./components/OperationsEnhancer";
 import VisualAtmosphere from "./components/VisualAtmosphere";
 import "./globals.css";
 import "./operations.css";
 import "./visual-v4.css";
+import "./media-v5.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -60,7 +62,8 @@ export const metadata: Metadata = {
   },
   other: {
     "codex-preview": "development",
-    "visual-version": "4.0",
+    "visual-version": "5.0",
+    "media-version": "5.0",
   },
   icons: {
     icon: "/favicon.svg",
@@ -87,6 +90,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <VisualAtmosphere />
         {children}
+        <CityMediaExperience />
         <OperationsEnhancer />
       </body>
     </html>
