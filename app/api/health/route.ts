@@ -22,7 +22,7 @@ export async function GET() {
       {
         status: "ok",
         service: "civiclens-ai",
-        version: "6.0",
+        version: "6.1",
         runtime: "cloudflare-workers",
         database: {
           status: "connected",
@@ -33,6 +33,17 @@ export async function GET() {
           activeUsers: Number(userCount?.total ?? 0),
           activeSessions: Number(sessionCount?.total ?? 0),
           roles: ["citizen", "operator", "admin"],
+        },
+        authentication: {
+          status: "ready",
+          registration: "atomic",
+          interruptedAccountRecovery: true,
+          sessionCookie: "http-only",
+        },
+        performance: {
+          version: "6.1",
+          heavyModules: "authenticated-only",
+          adaptiveMode: true,
         },
         inference: {
           mode: "demo-adapter",
@@ -48,7 +59,7 @@ export async function GET() {
       {
         status: "degraded",
         service: "civiclens-ai",
-        version: "6.0",
+        version: "6.1",
         runtime: "cloudflare-workers",
         database: {
           status: "unavailable",
@@ -56,6 +67,12 @@ export async function GET() {
         },
         multiuser: {
           status: "unavailable",
+        },
+        authentication: {
+          status: "unavailable",
+        },
+        performance: {
+          version: "6.1",
         },
         inference: {
           mode: "demo-adapter",
