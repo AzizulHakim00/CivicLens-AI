@@ -24,9 +24,10 @@ jobs:
       - run: npm test
       - name: Validate Cloudflare deployment bundle
         run: npx wrangler deploy --dry-run --outdir .wrangler-dry-run
-      - name: Smoke-test the Worker runtime
+      - name: Smoke-test the multi-user Worker runtime
         shell: bash
         run: |
+          npx wrangler d1 execute civiclens-production-db --local --file cloudflare-schema.sql
           npx wrangler dev --local --port 8787 > /tmp/civiclens-worker.log 2>&1 &
           worker_pid=$!
           trap 'kill "$worker_pid" 2>/dev/null || true' EXIT
@@ -51,22 +52,53 @@ jobs:
             exit 1
           }
 
-          grep -q 'name="media-version" content="5.0"' /tmp/civiclens-home.html || {
+          grep -q 'name="multiuser-version" content="6.0"' /tmp/civiclens-home.html || {
             cat /tmp/civiclens-home.html
             exit 1
           }
 
-          api_status=$(curl --silent --output /tmp/civiclens-api.json --write-out "%{http_code}" \
-            --request POST \
-            --header "content-type: application/json" \
-            --data '{"type":"Unknown"}' \
-            http://127.0.0.1:8787/api/reports)
+          auth_status=$(curl --silent --output /tmp/civiclens-auth.json --write-out "%{http_code}" \
+            http://127.0.0.1:8787/api/auth/me)
+          test "$auth_status" = "401" || { cat /tmp/civiclens-auth.json; exit 1; }
 
-          if [ "$api_status" != "400" ]; then
-            cat /tmp/civiclens-worker.log
-            cat /tmp/civiclens-api.json
-            exit 1
-          fi
+          register_status=$(curl --silent --show-error --dump-header /tmp/civiclens-register.headers \
+            --output /tmp/civiclens-register.json --write-out "%{http_code}" \
+            --request POST \
+            --header "Origin: http://127.0.0.1:8787" \
+            --header "content-type: application/json" \
+            --data '{"name":"CI Owner","organization":"CivicLens Test Authority","email":"ci-owner@example.com","password":"CivicLens2026Secure"}' \
+            http://127.0.0.1:8787/api/auth/register)
+          test "$register_status" = "201" || { cat /tmp/civiclens-worker.log; cat /tmp/civiclens-register.json; exit 1; }
+          grep -q '"role":"admin"' /tmp/civiclens-register.json || { cat /tmp/civiclens-register.json; exit 1; }
+          grep -q '"ownerClaimed":true' /tmp/civiclens-register.json || { cat /tmp/civiclens-register.json; exit 1; }
+
+          session_token=$(grep -i '^set-cookie:' /tmp/civiclens-register.headers | sed -E 's/.*civiclens_session=([^;]+).*/\1/' | tr -d '\r')
+          test -n "$session_token" || { cat /tmp/civiclens-register.headers; exit 1; }
+
+          me_status=$(curl --silent --output /tmp/civiclens-me.json --write-out "%{http_code}" \
+            --header "Cookie: civiclens_session=${session_token}" \
+            http://127.0.0.1:8787/api/auth/me)
+          test "$me_status" = "200" || { cat /tmp/civiclens-me.json; exit 1; }
+          grep -q '"manageUsers":true' /tmp/civiclens-me.json || { cat /tmp/civiclens-me.json; exit 1; }
+
+          report_status=$(curl --silent --output /tmp/civiclens-created-report.json --write-out "%{http_code}" \
+            --request POST \
+            --header "Origin: http://127.0.0.1:8787" \
+            --header "Cookie: civiclens_session=${session_token}" \
+            --header "content-type: application/json" \
+            --data '{"id":"CL-990001","type":"Pothole","severity":"High","confidence":94,"location":"CI Test Road","area":"CI Zone","status":"Reported","source":"Citizen","slaMinutes":180,"priorityScore":78}' \
+            http://127.0.0.1:8787/api/reports)
+          test "$report_status" = "201" || { cat /tmp/civiclens-created-report.json; exit 1; }
+
+          patch_status=$(curl --silent --output /tmp/civiclens-patched-report.json --write-out "%{http_code}" \
+            --request PATCH \
+            --header "Origin: http://127.0.0.1:8787" \
+            --header "Cookie: civiclens_session=${session_token}" \
+            --header "content-type: application/json" \
+            --data '{"id":"CL-990001","status":"Investigating","assignedTeam":"CI Road Team"}' \
+            http://127.0.0.1:8787/api/reports)
+          test "$patch_status" = "200" || { cat /tmp/civiclens-patched-report.json; exit 1; }
+          grep -q '"status":"Investigating"' /tmp/civiclens-patched-report.json || { cat /tmp/civiclens-patched-report.json; exit 1; }
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -80,7 +112,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Wait for Cloudflare and verify media v5
+      - name: Wait for Cloudflare and verify multi-user v6
         id: verify
         continue-on-error: true
         shell: bash
@@ -94,12 +126,13 @@ jobs:
               --header "Cache-Control: no-cache" \
               "${PRODUCTION_URL}/?deployment=${cache_buster}" \
               --output /tmp/civiclens-production.html; then
-              if grep -q 'name="media-version" content="5.0"' /tmp/civiclens-production.html; then
+              if grep -q 'name="multiuser-version" content="6.0"' /tmp/civiclens-production.html; then
                 if curl --fail --silent --show-error \
                   --header "Cache-Control: no-cache" \
                   "${PRODUCTION_URL}/api/health?deployment=${cache_buster}" \
                   --output /tmp/civiclens-health.json \
-                  && grep -q '"status":"ok"' /tmp/civiclens-health.json; then
+                  && grep -q '"status":"ok"' /tmp/civiclens-health.json \
+                  && grep -q '"multiuser":{"status":"ready"' /tmp/civiclens-health.json; then
                   verified=1
                   break
                 fi
@@ -109,13 +142,13 @@ jobs:
           done
 
           if [ "$verified" -ne 1 ]; then
-            echo "Cloudflare did not expose the expected media v5 build within the verification window."
+            echo "Cloudflare did not expose the expected multi-user v6 build within the verification window."
             test -f /tmp/civiclens-production.html && head -c 1200 /tmp/civiclens-production.html || true
             test -f /tmp/civiclens-health.json && cat /tmp/civiclens-health.json || true
             exit 1
           fi
 
-          echo "Production media v5 and the D1 health endpoint are live."
+          echo "Production multi-user v6, authentication schema and D1 health are live."
 
       - name: Publish production commit status
         if: always()
@@ -126,7 +159,7 @@ jobs:
         run: |
           if [ "$VERIFY_OUTCOME" = "success" ]; then
             state="success"
-            description="Cloudflare media v5 and D1 health are live"
+            description="Cloudflare multi-user v6 and D1 auth are live"
           else
             state="failure"
             description="Cloudflare production verification failed"

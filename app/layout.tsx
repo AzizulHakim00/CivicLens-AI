@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import AuthPortal from "./components/AuthPortal";
 import CityMediaExperience from "./components/CityMediaExperience";
 import OperationsEnhancer from "./components/OperationsEnhancer";
 import VisualAtmosphere from "./components/VisualAtmosphere";
@@ -7,6 +8,8 @@ import "./globals.css";
 import "./operations.css";
 import "./visual-v4.css";
 import "./media-v5.css";
+import "./auth-v6.css";
+import "./role-v6.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,7 +49,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "CivicLens AI — Urban Hazard Intelligence",
     description:
-      "An explainable AI platform for road-hazard detection, citizen reporting and authority operations.",
+      "A multi-user explainable AI platform for road-hazard detection, citizen reporting and authority operations.",
     url: "/",
     siteName: "CivicLens AI",
     type: "website",
@@ -54,7 +57,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary",
     title: "CivicLens AI",
-    description: "Explainable urban hazard detection and geospatial reporting platform.",
+    description: "Multi-user urban hazard detection and geospatial reporting platform.",
   },
   robots: {
     index: true,
@@ -62,8 +65,9 @@ export const metadata: Metadata = {
   },
   other: {
     "codex-preview": "development",
-    "visual-version": "5.0",
+    "visual-version": "6.0",
     "media-version": "5.0",
+    "multiuser-version": "6.0",
   },
   icons: {
     icon: "/favicon.svg",
@@ -92,6 +96,7 @@ export default function RootLayout({
         {children}
         <CityMediaExperience />
         <OperationsEnhancer />
+        <AuthPortal />
       </body>
     </html>
   );
