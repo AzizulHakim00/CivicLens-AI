@@ -4,7 +4,9 @@ import test from "node:test";
 const developmentPreviewMeta =
   /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
 const multiuserMeta =
-  /<meta(?=[^>]*\bname=["']multiuser-version["'])(?=[^>]*\bcontent=["']6\.0["'])[^>]*>/i;
+  /<meta(?=[^>]*\bname=["']multiuser-version["'])(?=[^>]*\bcontent=["']6\.1["'])[^>]*>/i;
+const performanceMeta =
+  /<meta(?=[^>]*\bname=["']performance-version["'])(?=[^>]*\bcontent=["']6\.1["'])[^>]*>/i;
 
 async function loadWorker(label) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -19,7 +21,7 @@ const environment = {
 };
 const context = { waitUntil() {}, passThroughOnException() {} };
 
-test("renders development preview and multi-user metadata", async () => {
+test("renders development, multi-user and performance metadata", async () => {
   const worker = await loadWorker("render-test");
   const response = await worker.fetch(
     new Request("http://localhost/", { headers: { accept: "text/html" } }),
@@ -32,6 +34,7 @@ test("renders development preview and multi-user metadata", async () => {
   const html = await response.text();
   assert.match(html, developmentPreviewMeta);
   assert.match(html, multiuserMeta);
+  assert.match(html, performanceMeta);
   assert.match(html, /CivicLens/);
   assert.match(html, /Urban hazard intelligence/);
   assert.match(html, /Securing your workspace/);
