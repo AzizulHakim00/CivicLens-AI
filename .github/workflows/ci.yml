@@ -67,3 +67,44 @@ jobs:
           cache: pip
       - run: pip install -r ai-service/requirements.txt
       - run: pytest ai-service/tests -q
+
+  verify-production:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Wait for Cloudflare and verify visual v4
+        shell: bash
+        env:
+          PRODUCTION_URL: https://civiclens-ai.mdomor01815.workers.dev
+        run: |
+          verified=0
+          for attempt in {1..36}; do
+            cache_buster="${GITHUB_SHA}-${attempt}"
+            if curl --fail --silent --show-error \
+              --header "Cache-Control: no-cache" \
+              "${PRODUCTION_URL}/?deployment=${cache_buster}" \
+              --output /tmp/civiclens-production.html; then
+              if grep -q 'name="visual-version" content="4.0"' /tmp/civiclens-production.html; then
+                if curl --fail --silent --show-error \
+                  --header "Cache-Control: no-cache" \
+                  "${PRODUCTION_URL}/api/health?deployment=${cache_buster}" \
+                  --output /tmp/civiclens-health.json \
+                  && grep -q '"status":"ok"' /tmp/civiclens-health.json; then
+                  verified=1
+                  break
+                fi
+              fi
+            fi
+            sleep 10
+          done
+
+          if [ "$verified" -ne 1 ]; then
+            echo "Cloudflare did not expose the expected visual v4 build within the verification window."
+            test -f /tmp/civiclens-production.html && head -c 1200 /tmp/civiclens-production.html || true
+            test -f /tmp/civiclens-health.json && cat /tmp/civiclens-health.json || true
+            exit 1
+          fi
+
+          echo "Production visual v4 and the D1 health endpoint are live."
