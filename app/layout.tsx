@@ -9,6 +9,7 @@ import "./operations.css";
 import "./visual-v4.css";
 import "./media-v5.css";
 import "./auth-v6.css";
+import "./role-v6.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
