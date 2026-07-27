@@ -1,9 +1,8 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useState } from "react";
-
-const CityMediaExperience = lazy(() => import("./CityMediaExperience"));
-const OperationsEnhancer = lazy(() => import("./OperationsEnhancer"));
+import { useEffect, useState } from "react";
+import CityMediaExperience from "./CityMediaExperience";
+import OperationsEnhancer from "./OperationsEnhancer";
 
 export default function AuthenticatedEnhancements() {
   const [authenticated, setAuthenticated] = useState(false);
@@ -25,9 +24,9 @@ export default function AuthenticatedEnhancements() {
   if (!authenticated) return null;
 
   return (
-    <Suspense fallback={null}>
+    <>
       <CityMediaExperience />
       <OperationsEnhancer />
-    </Suspense>
+    </>
   );
 }
