@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import OperationsEnhancer from "./components/OperationsEnhancer";
+import VisualAtmosphere from "./components/VisualAtmosphere";
 import "./globals.css";
 import "./operations.css";
+import "./visual-v4.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -58,6 +60,7 @@ export const metadata: Metadata = {
   },
   other: {
     "codex-preview": "development",
+    "visual-version": "4.0",
   },
   icons: {
     icon: "/favicon.svg",
@@ -71,7 +74,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   colorScheme: "dark",
-  themeColor: "#07101f",
+  themeColor: "#050b18",
 };
 
 export default function RootLayout({
@@ -82,6 +85,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <VisualAtmosphere />
         {children}
         <OperationsEnhancer />
       </body>
