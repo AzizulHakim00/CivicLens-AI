@@ -24,7 +24,7 @@ jobs:
       - run: npm test
       - name: Validate Cloudflare deployment bundle
         run: npx wrangler deploy --dry-run --outdir .wrangler-dry-run
-      - name: Smoke-test the multi-user Worker runtime
+      - name: Smoke-test atomic authentication and Worker runtime
         shell: bash
         run: |
           npx wrangler d1 execute civiclens-production-db --local --file cloudflare-schema.sql
@@ -52,7 +52,11 @@ jobs:
             exit 1
           }
 
-          grep -q 'name="multiuser-version" content="6.0"' /tmp/civiclens-home.html || {
+          grep -q 'name="multiuser-version" content="6.1"' /tmp/civiclens-home.html || {
+            cat /tmp/civiclens-home.html
+            exit 1
+          }
+          grep -q 'name="performance-version" content="6.1"' /tmp/civiclens-home.html || {
             cat /tmp/civiclens-home.html
             exit 1
           }
@@ -61,14 +65,16 @@ jobs:
             http://127.0.0.1:8787/api/auth/me)
           test "$auth_status" = "401" || { cat /tmp/civiclens-auth.json; exit 1; }
 
-          register_status=$(curl --silent --show-error --dump-header /tmp/civiclens-register.headers \
-            --output /tmp/civiclens-register.json --write-out "%{http_code}" \
+          register_result=$(curl --silent --show-error --dump-header /tmp/civiclens-register.headers \
+            --output /tmp/civiclens-register.json --write-out "%{http_code} %{time_total}" \
             --request POST \
             --header "Origin: http://127.0.0.1:8787" \
             --header "content-type: application/json" \
             --data '{"name":"CI Owner","organization":"CivicLens Test Authority","email":"ci-owner@example.com","password":"CivicLens2026Secure"}' \
             http://127.0.0.1:8787/api/auth/register)
+          read -r register_status register_time <<< "$register_result"
           test "$register_status" = "201" || { cat /tmp/civiclens-worker.log; cat /tmp/civiclens-register.json; exit 1; }
+          awk "BEGIN { exit !($register_time < 12) }" || { echo "Registration was too slow: ${register_time}s"; exit 1; }
           grep -q '"role":"admin"' /tmp/civiclens-register.json || { cat /tmp/civiclens-register.json; exit 1; }
           grep -q '"ownerClaimed":true' /tmp/civiclens-register.json || { cat /tmp/civiclens-register.json; exit 1; }
 
@@ -80,6 +86,18 @@ jobs:
             http://127.0.0.1:8787/api/auth/me)
           test "$me_status" = "200" || { cat /tmp/civiclens-me.json; exit 1; }
           grep -q '"manageUsers":true' /tmp/civiclens-me.json || { cat /tmp/civiclens-me.json; exit 1; }
+
+          # Repeating registration with the same valid credentials must recover
+          # a previously interrupted account instead of returning a conflict.
+          resume_status=$(curl --silent --show-error --dump-header /tmp/civiclens-resume.headers \
+            --output /tmp/civiclens-resume.json --write-out "%{http_code}" \
+            --request POST \
+            --header "Origin: http://127.0.0.1:8787" \
+            --header "content-type: application/json" \
+            --data '{"name":"CI Owner","organization":"CivicLens Test Authority","email":"ci-owner@example.com","password":"CivicLens2026Secure"}' \
+            http://127.0.0.1:8787/api/auth/register)
+          test "$resume_status" = "200" || { cat /tmp/civiclens-resume.json; exit 1; }
+          grep -q '"resumed":true' /tmp/civiclens-resume.json || { cat /tmp/civiclens-resume.json; exit 1; }
 
           report_status=$(curl --silent --output /tmp/civiclens-created-report.json --write-out "%{http_code}" \
             --request POST \
@@ -112,7 +130,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Wait for Cloudflare and verify multi-user v6
+      - name: Wait for Cloudflare and verify auth/performance v6.1
         id: verify
         continue-on-error: true
         shell: bash
@@ -126,13 +144,16 @@ jobs:
               --header "Cache-Control: no-cache" \
               "${PRODUCTION_URL}/?deployment=${cache_buster}" \
               --output /tmp/civiclens-production.html; then
-              if grep -q 'name="multiuser-version" content="6.0"' /tmp/civiclens-production.html; then
+              if grep -q 'name="multiuser-version" content="6.1"' /tmp/civiclens-production.html \
+                && grep -q 'name="performance-version" content="6.1"' /tmp/civiclens-production.html; then
                 if curl --fail --silent --show-error \
                   --header "Cache-Control: no-cache" \
                   "${PRODUCTION_URL}/api/health?deployment=${cache_buster}" \
                   --output /tmp/civiclens-health.json \
                   && grep -q '"status":"ok"' /tmp/civiclens-health.json \
-                  && grep -q '"multiuser":{"status":"ready"' /tmp/civiclens-health.json; then
+                  && grep -q '"multiuser":{"status":"ready"' /tmp/civiclens-health.json \
+                  && grep -q '"authentication":{"status":"ready","registration":"atomic"' /tmp/civiclens-health.json \
+                  && grep -q '"performance":{"version":"6.1"' /tmp/civiclens-health.json; then
                   verified=1
                   break
                 fi
@@ -142,13 +163,13 @@ jobs:
           done
 
           if [ "$verified" -ne 1 ]; then
-            echo "Cloudflare did not expose the expected multi-user v6 build within the verification window."
+            echo "Cloudflare did not expose the expected auth/performance v6.1 build within the verification window."
             test -f /tmp/civiclens-production.html && head -c 1200 /tmp/civiclens-production.html || true
             test -f /tmp/civiclens-health.json && cat /tmp/civiclens-health.json || true
             exit 1
           fi
 
-          echo "Production multi-user v6, authentication schema and D1 health are live."
+          echo "Production atomic registration, account recovery, adaptive runtime and D1 health are live."
 
       - name: Publish production commit status
         if: always()
@@ -159,7 +180,7 @@ jobs:
         run: |
           if [ "$VERIFY_OUTCOME" = "success" ]; then
             state="success"
-            description="Cloudflare multi-user v6 and D1 auth are live"
+            description="Cloudflare auth and performance v6.1 are live"
           else
             state="failure"
             description="Cloudflare production verification failed"
