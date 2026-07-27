@@ -1,7 +1,7 @@
 /* global self, caches, fetch, Response, URL */
 
-const CACHE_NAME = "civiclens-shell-v3";
-const STATIC_ASSETS = ["/", "/favicon.svg", "/manifest.webmanifest"];
+const CACHE_NAME = "civiclens-shell-v6-1";
+const STATIC_ASSETS = ["/favicon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -43,8 +43,10 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put("/", copy)).catch(() => undefined);
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put("/", copy)).catch(() => undefined);
+          }
           return response;
         })
         .catch(() => caches.match("/").then((response) => response || Response.error())),
@@ -52,9 +54,15 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
+  const isCodeAsset =
+    request.destination === "script" ||
+    request.destination === "style" ||
+    url.pathname.endsWith(".js") ||
+    url.pathname.endsWith(".css");
+
+  if (isCodeAsset) {
+    event.respondWith(
+      fetch(request)
         .then((response) => {
           if (response.ok) {
             const copy = response.clone();
@@ -62,8 +70,21 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(() => cached || Response.error());
-      return cached || network;
+        .catch(() => caches.match(request).then((cached) => cached || Response.error())),
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      if (cached) return cached;
+      return fetch(request).then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => undefined);
+        }
+        return response;
+      });
     }),
   );
 });
