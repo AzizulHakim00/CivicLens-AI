@@ -51,6 +51,11 @@ jobs:
             exit 1
           }
 
+          grep -q 'name="media-version" content="5.0"' /tmp/civiclens-home.html || {
+            cat /tmp/civiclens-home.html
+            exit 1
+          }
+
           api_status=$(curl --silent --output /tmp/civiclens-api.json --write-out "%{http_code}" \
             --request POST \
             --header "content-type: application/json" \
@@ -75,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Wait for Cloudflare and verify visual v4
+      - name: Wait for Cloudflare and verify media v5
         id: verify
         continue-on-error: true
         shell: bash
@@ -89,7 +94,7 @@ jobs:
               --header "Cache-Control: no-cache" \
               "${PRODUCTION_URL}/?deployment=${cache_buster}" \
               --output /tmp/civiclens-production.html; then
-              if grep -q 'name="visual-version" content="4.0"' /tmp/civiclens-production.html; then
+              if grep -q 'name="media-version" content="5.0"' /tmp/civiclens-production.html; then
                 if curl --fail --silent --show-error \
                   --header "Cache-Control: no-cache" \
                   "${PRODUCTION_URL}/api/health?deployment=${cache_buster}" \
@@ -104,13 +109,13 @@ jobs:
           done
 
           if [ "$verified" -ne 1 ]; then
-            echo "Cloudflare did not expose the expected visual v4 build within the verification window."
+            echo "Cloudflare did not expose the expected media v5 build within the verification window."
             test -f /tmp/civiclens-production.html && head -c 1200 /tmp/civiclens-production.html || true
             test -f /tmp/civiclens-health.json && cat /tmp/civiclens-health.json || true
             exit 1
           fi
 
-          echo "Production visual v4 and the D1 health endpoint are live."
+          echo "Production media v5 and the D1 health endpoint are live."
 
       - name: Publish production commit status
         if: always()
@@ -121,7 +126,7 @@ jobs:
         run: |
           if [ "$VERIFY_OUTCOME" = "success" ]; then
             state="success"
-            description="Cloudflare visual v4 and D1 health are live"
+            description="Cloudflare media v5 and D1 health are live"
           else
             state="failure"
             description="Cloudflare production verification failed"
