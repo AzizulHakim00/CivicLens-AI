@@ -1,0 +1,113 @@
+/* CivicLens performance layer: preserves the visual design while avoiding
+   hidden dashboard work and expensive effects on constrained devices. */
+
+html[data-auth-state="loading"] .app-shell,
+html[data-auth-state="anonymous"] .app-shell {
+  display: none !important;
+}
+
+html[data-auth-state="loading"] .visual-pointer-glow,
+html[data-auth-state="loading"] .visual-particles,
+html[data-auth-state="loading"] .visual-orbit,
+html[data-auth-state="loading"] .visual-scan-beam,
+html[data-auth-state="anonymous"] .visual-pointer-glow,
+html[data-auth-state="anonymous"] .visual-particles,
+html[data-auth-state="anonymous"] .visual-orbit,
+html[data-auth-state="anonymous"] .visual-scan-beam {
+  display: none !important;
+}
+
+html[data-auth-state="loading"] .visual-grid-layer,
+html[data-auth-state="anonymous"] .visual-grid-layer {
+  opacity: 0.22;
+  animation: none !important;
+}
+
+html[data-auth-state="loading"] .visual-aurora,
+html[data-auth-state="anonymous"] .visual-aurora {
+  animation: none !important;
+  filter: blur(54px);
+  opacity: 0.24;
+}
+
+html[data-runtime-paused="true"] *,
+html[data-runtime-paused="true"] *::before,
+html[data-runtime-paused="true"] *::after {
+  animation-play-state: paused !important;
+}
+
+.workspace > section,
+.overview-grid,
+.bottom-grid,
+.roads-main-grid,
+.road-bottom-grid,
+.model-main-grid,
+.command-grid {
+  content-visibility: auto;
+  contain-intrinsic-size: 800px;
+}
+
+html[data-performance="lite"] .visual-particles span:nth-child(n + 6),
+html[data-performance="lite"] .visual-orbit-two,
+html[data-performance="lite"] .visual-noise,
+html[data-performance="lite"] .visual-scan-beam {
+  display: none !important;
+}
+
+html[data-performance="lite"] .visual-pointer-glow {
+  opacity: 0.25;
+  filter: blur(28px);
+}
+
+html[data-performance="lite"] .visual-aurora,
+html[data-performance="lite"] .visual-grid-layer,
+html[data-performance="lite"] .map-scan,
+html[data-performance="lite"] .marker-pulse,
+html[data-performance="lite"] .orbit-dot,
+html[data-performance="lite"] .media-video-scan {
+  animation-duration: 28s !important;
+}
+
+html[data-performance="lite"] .panel,
+html[data-performance="lite"] .topbar,
+html[data-performance="lite"] .sidebar,
+html[data-performance="lite"] .auth-card,
+html[data-performance="lite"] .auth-panel-shell,
+html[data-performance="lite"] .ops-command-panel,
+html[data-performance="lite"] .media-shell {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html[data-performance="lite"] .panel,
+html[data-performance="lite"] .auth-card,
+html[data-performance="lite"] .dispatch-card,
+html[data-performance="lite"] .media-video-card,
+html[data-performance="lite"] .media-featured-story {
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22) !important;
+}
+
+html[data-performance="lite"] .city-map,
+html[data-performance="lite"] .media-video-card video,
+html[data-performance="lite"] .media-featured-story img {
+  transform: translateZ(0);
+}
+
+@media (max-width: 760px) {
+  .visual-pointer-glow,
+  .visual-orbit,
+  .visual-noise,
+  .visual-scan-beam {
+    display: none !important;
+  }
+
+  .visual-particles span:nth-child(n + 5) {
+    display: none !important;
+  }
+
+  .workspace > section,
+  .overview-grid,
+  .bottom-grid {
+    contain-intrinsic-size: 620px;
+  }
+}

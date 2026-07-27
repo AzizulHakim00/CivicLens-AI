@@ -22,12 +22,19 @@ export default function VisualAtmosphere() {
   useEffect(() => {
     const root = document.documentElement;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let frame = 0;
+    let pointerFrame = 0;
+    let scrollFrame = 0;
+
+    const effectsEnabled = () =>
+      !reducedMotion.matches &&
+      root.dataset.performance !== "lite" &&
+      root.dataset.authState === "authenticated" &&
+      root.dataset.runtimePaused !== "true";
 
     const updatePointer = (event: PointerEvent) => {
-      if (reducedMotion.matches) return;
-      window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(() => {
+      if (!effectsEnabled() || pointerFrame) return;
+      pointerFrame = window.requestAnimationFrame(() => {
+        pointerFrame = 0;
         root.style.setProperty("--pointer-x", `${event.clientX}px`);
         root.style.setProperty("--pointer-y", `${event.clientY}px`);
         root.style.setProperty("--pointer-rx", `${((event.clientY / window.innerHeight) - 0.5) * -3}deg`);
@@ -36,9 +43,13 @@ export default function VisualAtmosphere() {
     };
 
     const updateScroll = () => {
-      const available = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = available > 0 ? Math.min(1, window.scrollY / available) : 0;
-      root.style.setProperty("--scroll-progress", `${progress * 100}%`);
+      if (scrollFrame) return;
+      scrollFrame = window.requestAnimationFrame(() => {
+        scrollFrame = 0;
+        const available = document.documentElement.scrollHeight - window.innerHeight;
+        const progress = available > 0 ? Math.min(1, window.scrollY / available) : 0;
+        root.style.setProperty("--scroll-progress", `${progress * 100}%`);
+      });
     };
 
     window.addEventListener("pointermove", updatePointer, { passive: true });
@@ -46,7 +57,8 @@ export default function VisualAtmosphere() {
     updateScroll();
 
     return () => {
-      window.cancelAnimationFrame(frame);
+      window.cancelAnimationFrame(pointerFrame);
+      window.cancelAnimationFrame(scrollFrame);
       window.removeEventListener("pointermove", updatePointer);
       window.removeEventListener("scroll", updateScroll);
     };

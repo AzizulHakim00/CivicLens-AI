@@ -13,7 +13,12 @@ import {
   verifyPassword,
 } from "../../../../lib/auth";
 
+function timing(startedAt: number) {
+  return { "server-timing": `login;dur=${Math.max(0, Date.now() - startedAt)}` };
+}
+
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   if (!sameOrigin(request)) return Response.json({ error: "Cross-site request rejected." }, { status: 403 });
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (contentLength > 16_384) return Response.json({ error: "Payload is too large." }, { status: 413 });
@@ -22,7 +27,9 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Record<string, unknown>;
     const email = normalizeEmail(body.email);
     const password = typeof body.password === "string" ? body.password : "";
-    if (!email || !password) return Response.json({ error: "Email and password are required." }, { status: 400 });
+    if (!email || !password) {
+      return Response.json({ error: "Email and password are required." }, { status: 400, headers: timing(startedAt) });
+    }
 
     const fingerprint = await authFingerprint(request, email);
     const blockedUntil = await authBlocked(fingerprint);
@@ -30,7 +37,7 @@ export async function POST(request: Request) {
       const retryAfter = Math.max(1, Math.ceil((blockedUntil - Date.now()) / 1000));
       return Response.json(
         { error: "Too many sign-in attempts. Try again later." },
-        { status: 429, headers: { "retry-after": String(retryAfter) } },
+        { status: 429, headers: { ...timing(startedAt), "retry-after": String(retryAfter) } },
       );
     }
 
@@ -58,14 +65,21 @@ export async function POST(request: Request) {
     const valid = user ? await verifyPassword(password, user.passwordHash, user.passwordSalt) : false;
     if (!valid || !user || user.status !== "active") {
       await recordAuthFailure(fingerprint);
-      return Response.json({ error: "Invalid email or password." }, { status: 401 });
+      return Response.json({ error: "Invalid email or password." }, { status: 401, headers: timing(startedAt) });
     }
 
-    await clearAuthFailures(fingerprint);
     const now = Date.now();
-    await db.prepare("UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?").bind(now, now, user.id).run();
     const session = await createSession(user.id, request);
-    await recordAudit(user.id, "account.login", "session", "", { userAgent: cleanText(request.headers.get("user-agent"), 120) });
+
+    // These maintenance writes are useful but must not invalidate an otherwise
+    // successful login and leave the user with an orphaned session.
+    await Promise.allSettled([
+      clearAuthFailures(fingerprint),
+      db.prepare("UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?").bind(now, now, user.id).run(),
+      recordAudit(user.id, "account.login", "session", "", {
+        userAgent: cleanText(request.headers.get("user-agent"), 120),
+      }),
+    ]);
 
     return Response.json(
       {
@@ -80,9 +94,17 @@ export async function POST(request: Request) {
           lastLoginAt: now,
         },
       },
-      { headers: { "set-cookie": sessionCookie(session.token, session.expiresAt) } },
+      {
+        headers: { ...timing(startedAt), "set-cookie": sessionCookie(session.token, session.expiresAt) },
+      },
     );
-  } catch {
-    return Response.json({ error: "Sign-in is temporarily unavailable." }, { status: 503 });
+  } catch (error) {
+    const requestId = crypto.randomUUID().slice(0, 8);
+    const message = error instanceof Error ? error.message : "Sign-in failed";
+    console.error("CivicLens sign-in failed", { requestId, message });
+    return Response.json(
+      { error: `Sign-in is temporarily unavailable. Reference: ${requestId}` },
+      { status: 503, headers: timing(startedAt) },
+    );
   }
 }
