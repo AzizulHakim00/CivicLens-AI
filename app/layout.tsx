@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import AuthenticatedEnhancements from "./components/AuthenticatedEnhancements";
 import AuthPortal from "./components/AuthPortal";
-import CityMediaExperience from "./components/CityMediaExperience";
-import OperationsEnhancer from "./components/OperationsEnhancer";
+import RuntimeOptimizer from "./components/RuntimeOptimizer";
 import VisualAtmosphere from "./components/VisualAtmosphere";
 import "./globals.css";
 import "./operations.css";
@@ -10,6 +10,7 @@ import "./visual-v4.css";
 import "./media-v5.css";
 import "./auth-v6.css";
 import "./role-v6.css";
+import "./performance-v6-1.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -65,9 +66,10 @@ export const metadata: Metadata = {
   },
   other: {
     "codex-preview": "development",
-    "visual-version": "6.0",
+    "visual-version": "6.1",
     "media-version": "5.0",
-    "multiuser-version": "6.0",
+    "multiuser-version": "6.1",
+    "performance-version": "6.1",
   },
   icons: {
     icon: "/favicon.svg",
@@ -90,13 +92,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-auth-state="loading">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <VisualAtmosphere />
-        {children}
-        <CityMediaExperience />
-        <OperationsEnhancer />
+        <RuntimeOptimizer />
         <AuthPortal />
+        {children}
+        <AuthenticatedEnhancements />
       </body>
     </html>
   );
